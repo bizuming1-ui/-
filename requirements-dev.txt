@@ -1,0 +1,5 @@
+# Python 3.11+; CPU-only
+numpy>=1.26,<3
+pandas>=2.2,<3
+pytest>=8,<9
+matplotlib>=3.8,<4

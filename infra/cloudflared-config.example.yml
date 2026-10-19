@@ -1,0 +1,13 @@
+# Alternative named-tunnel config for deployments that use a credentials file.
+# The standard docker-compose deployment instead uses CLOUDFLARE_TUNNEL_TOKEN
+# and configures the hostname/service in Cloudflare Zero Trust.
+# Store credentials on the server only; never commit the real tunnel token/file.
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID.json
+
+ingress:
+  - hostname: quant.example.com
+    service: http://quant-web:80
+    originRequest:
+      httpHostHeader: quant.example.com
+  - service: http_status:404
