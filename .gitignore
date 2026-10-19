@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets and local runtime state
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite3
+*.log
+
+# Frontend
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Generated datasets and artifacts
+*.csv
+*.parquet
+*.zip
+*.tar
+*.tar.gz
