@@ -19,6 +19,10 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from backend.app.alpaca_paper import AlpacaPaperClient
 from backend.app.paper_engine import EnginePreflightError, PaperEngine
+from backend.app.sz_market_client import SZPaperMarketClient
+from backend.app.sz_portfolio import SZPortfolioStore
+from backend.app.sz159502_engine import SZ159502Engine, SZEnginePreflightError
+from backend.app.tonghuashun_market import demo_5min_bars_note, demo_snapshot, tonghuashun_status
 from backend.app.security import clear_login_failures, login_rate_limited, record_login_failure, require_authenticated, verify_password
 from backend.app.settings import Settings, get_settings
 from backend.app.store import StateStore
@@ -50,6 +54,15 @@ async def lifespan(app: FastAPI):
     app.state.store = store
     app.state.alpaca = None
     app.state.engine = None
+    # SZ 159502 纸面模拟器：离线优先，不默认轮询；Key 仅服务端环境变量
+    app.state.sz_portfolio = SZPortfolioStore(settings.database_path, settings)
+    # 预构建 Demo 5min bars 用于离线演示（合成、非真实）
+    try:
+        demo_bars = SZPaperMarketClient.build_demo_bars(days=3, symbol=settings.sz159502_symbol)
+    except Exception:
+        demo_bars = None
+    app.state.sz_client = SZPaperMarketClient(settings, app.state.sz_portfolio, ths_client=None, demo_bars=demo_bars)
+    app.state.sz_engine = SZ159502Engine(settings, app.state.sz_client, store)
     if settings.app_mode == "paper":
         client = AlpacaPaperClient(settings)
         engine = PaperEngine(settings, client, store)
@@ -61,6 +74,8 @@ async def lifespan(app: FastAPI):
     yield
     if app.state.engine:
         await app.state.engine.shutdown()
+    if getattr(app.state, "sz_engine", None):
+        await app.state.sz_engine.shutdown()
     logger.info("Quant Desk API stopped")
 
 
@@ -124,6 +139,13 @@ def health(request: Request) -> dict[str, Any]:
         "mode": settings.app_mode,
         "market_data_feed": "Alpaca IEX" if settings.app_mode == "paper" else "Demo fixture",
         "paper_only": True,
+        "sz159502": {
+            "symbol": settings.sz159502_symbol,
+            "currency": settings.sz159502_currency,
+            "poll_enabled": settings.sz159502_poll_enabled,
+            "has_authorized_5min_history": settings.sz159502_has_authorized_5min_history,
+            "demo_labeled": True,
+        },
     }
 
 
@@ -291,6 +313,103 @@ def kaggle_notebook() -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="Kaggle Notebook 正在生成")
     return FileResponse(path, media_type="application/x-ipynb+json", filename="quant_research.ipynb")
+
+
+@app.get("/api/sz159502/status", dependencies=[Depends(_auth)])
+def sz_status(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    return tonghuashun_status(settings)
+
+
+@app.get("/api/sz159502/snapshot", dependencies=[Depends(_auth)])
+def sz_snapshot(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    # 离线 Demo 快照：清晰标注非实时；真实接口仅在 tonghuashun_enabled 且有 Key 时按需调用（此处不自动触发）
+    return demo_snapshot(settings)
+
+
+@app.get("/api/sz159502/bars-note", dependencies=[Depends(_auth)])
+def sz_bars_note(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    return demo_5min_bars_note(settings)
+
+
+@app.get("/api/sz159502/demo-dashboard", dependencies=[Depends(_auth)])
+async def sz_demo_dashboard(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    # 159502 离线纸面仪表板：¥100,000 初始、10% 单笔、2% 日熔断（止新买+尝试卖出）、占位成本、允许隔夜
+    portfolio = request.app.state.sz_portfolio
+    # 用合成 demo bars 计算展示用权益曲线（非真实回测）
+    from shared.quant_core import demo_sz159502_equity_curve
+    equity_curve = demo_sz159502_equity_curve()
+    account = portfolio.account_snapshot()
+    positions = portfolio.positions()
+    # 若无持仓，补充一个演示持仓示例以展示界面（明确 demo）
+    if not positions:
+        positions = [
+            {"symbol": settings.sz159502_symbol, "qty": 800, "side": "long", "avg_entry_price": 1.021, "current_price": 1.045, "market_value": 836.0, "unrealized_pl": 19.2, "unrealized_plpc": 0.0235},
+        ]
+        # 调整权益以自洽
+        account = {**account, "equity": 101820.0, "portfolio_value": 836.0, "cash": 100984.0}
+    return {
+        "mode": "demo",
+        "offline": True,
+        "symbol": settings.sz159502_symbol,
+        "name": settings.sz159502_name,
+        "market": settings.sz159502_market,
+        "timezone": settings.sz159502_timezone,
+        "currency": settings.sz159502_currency,
+        "feed": "离线演示 · 非实时行情 · 未获授权 5 分钟真实数据不作回测",
+        "disclaimer": "纸面模拟 · 合成演示 · 不构成投资建议",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "account": account,
+        "positions": positions,
+        "strategy": {"fast_window": settings.fast_window, "slow_window": settings.slow_window, "bar_minutes": 5, "side": "long-only", "execution": "下一根可交易 K 开盘成交", "overnight": "允许隔夜"},
+        "risk": {
+            "initial_equity": settings.sz159502_initial_equity,
+            "per_trade_fraction": settings.sz159502_per_trade_fraction,
+            "daily_loss_limit_fraction": settings.sz159502_daily_loss_limit_fraction,
+            "behavior": "日回撤 2% 后停止新买入并尝试卖出可卖持仓",
+        },
+        "cost": {"slippage_bps": settings.sz159502_slippage_bps, "commission_per_order": settings.sz159502_commission_per_order, "note": settings.sz159502_cost_note, "is_placeholder": True},
+        "engine": request.app.state.sz_engine.status(),
+        "equity_curve": equity_curve,
+        "orders": portfolio.recent_orders(10),
+        "unverified": ["同花顺 Playground code=0 待确认费用/额度/授权", "历史基金接口日线；159502 五分钟历史未授权不回测", "实时轮询默认关闭；Key 仅服务端环境变量"],
+    }
+
+
+@app.post("/api/sz159502/engine/start", dependencies=[Depends(_auth)])
+async def sz_engine_start(request: Request, payload: StartRequest = StartRequest()) -> dict[str, Any]:
+    _csrf(request)
+    settings = _settings(request)
+    engine: SZ159502Engine = request.app.state.sz_engine
+    if not settings.sz159502_poll_enabled:
+        raise HTTPException(status_code=409, detail="159502 实时轮询默认关闭；请先确认授权与风控后再显式开启（当前为离线 Demo）")
+    previous = engine.status()
+    if previous.get("paused_reason") == "daily_loss_limit" and not payload.acknowledge_risk:
+        raise HTTPException(status_code=409, detail="当日回撤熔断已触发；请先阅读风险提示并明确确认")
+    try:
+        return await engine.start(acknowledge_risk=payload.acknowledge_risk)
+    except SZEnginePreflightError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/sz159502/engine/stop", dependencies=[Depends(_auth)])
+async def sz_engine_stop(request: Request) -> dict[str, Any]:
+    _csrf(request)
+    engine: SZ159502Engine | None = getattr(request.app.state, "sz_engine", None)
+    if engine is None:
+        return {"enabled": False, "note": "演示模式；没有订单引擎"}
+    return await engine.stop()
+
+
+@app.get("/api/sz159502/engine/status", dependencies=[Depends(_auth)])
+def sz_engine_status(request: Request) -> dict[str, Any]:
+    engine = getattr(request.app.state, "sz_engine", None)
+    if not engine:
+        return {"enabled": False, "note": "演示模式；未连接行情"}
+    return engine.status()
 
 
 def _demo_dashboard(settings: Settings) -> dict[str, Any]:

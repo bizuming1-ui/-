@@ -16,7 +16,10 @@ import numpy as np
 import pandas as pd
 
 NY_TZ = "America/New_York"
+SZ_TZ = "Asia/Shanghai"
 REQUIRED_OHLCV = ("open", "high", "low", "close", "volume")
+# 159502 深圳市场：09:30-11:30, 13:00-15:00 CST；成本为占位值，非真实费率
+SZ_SESSION = ((9, 30, 11, 30), (13, 0, 15, 0))
 ALIASES = {
     "timestamp": ("timestamp", "datetime", "date", "time", "DateTime"),
     "open": ("open", "Open"),
@@ -38,6 +41,10 @@ class BacktestConfig:
     slippage_bps: float = 5.0
     commission_per_order: float = 0.0
     bars_per_year: int = 252  # Metrics are calculated from daily marked equity, not raw intraday bars.
+    # 159502 扩展：市场与货币仅用于标注，成本为占位值
+    market: str = "us"
+    currency: str = "USD"
+    cost_note: str = "成本为可配置占位值，非真实费率"
 
     def validate(self) -> None:
         if not (1 <= self.fast_window < self.slow_window):
@@ -52,6 +59,10 @@ class BacktestConfig:
             raise ValueError("max_gross_exposure_fraction must be in (0, 1]")
         if not (0 <= self.slippage_bps < 10_000) or self.commission_per_order < 0:
             raise ValueError("slippage must be in [0, 10000) bps and commission must be non-negative")
+        if self.market not in ("us", "sz"):
+            raise ValueError("market must be 'us' or 'sz'")
+        if self.currency not in ("USD", "CNY"):
+            raise ValueError("currency must be USD or CNY")
 
 
 def _find_column(columns: list[Any], names: tuple[str, ...]) -> Any | None:
@@ -69,6 +80,8 @@ def normalize_ohlcv(
     source_timezone: str | None = None,
     default_symbol: str | None = None,
     regular_hours_only: bool = True,
+    market: str = "us",
+    session_timezone: str | None = None,
 ) -> pd.DataFrame:
     """Normalize common CSV schemas to UTC OHLCV rows.
 
@@ -145,13 +158,31 @@ def normalize_ohlcv(
     if out.duplicated(["symbol", "timestamp"]).any():
         raise ValueError("duplicate symbol/timestamp rows found")
     if regular_hours_only:
-        local = out["timestamp"].dt.tz_convert(NY_TZ)
+        tz = session_timezone or (SZ_TZ if market == "sz" else NY_TZ)
+        local = out["timestamp"].dt.tz_convert(tz)
         minutes = local.dt.hour * 60 + local.dt.minute
-        # Bar-open labels from 09:30 through 15:55 are regular session bars.
-        out = out.loc[(minutes >= 9 * 60 + 30) & (minutes < 16 * 60)].copy()
+        if market == "sz":
+            # 深圳 09:30-11:30, 13:00-15:00（含 09:30,13:00 开盘；15:00 为收盘不含新开盘 bar）
+            # 5 分钟 bar 允许的开盘时刻：09:30-11:25 与 13:00-14:55
+            morning = (minutes >= 9 * 60 + 30) & (minutes <= 11 * 60 + 25)
+            afternoon = (minutes >= 13 * 60) & (minutes <= 14 * 60 + 55)
+            out = out.loc[morning | afternoon].copy()
+        else:
+            # 美股 09:30-16:00
+            out = out.loc[(minutes >= 9 * 60 + 30) & (minutes < 16 * 60)].copy()
         if out.empty:
             raise ValueError("no regular-session bars remain; verify timestamp timezone")
     return out.reset_index(drop=True)
+
+
+def normalize_sz_ohlcv(
+    frame: pd.DataFrame,
+    *,
+    source_timezone: str | None = "Asia/Shanghai",
+    default_symbol: str | None = "159502.SZ",
+) -> pd.DataFrame:
+    """159502.SZ 专用：默认上海时区、深圳交易时段过滤、离线优先。"""
+    return normalize_ohlcv(frame, source_timezone=source_timezone, default_symbol=default_symbol, regular_hours_only=True, market="sz")
 
 
 def add_sma_signals(
@@ -176,13 +207,14 @@ def add_sma_signals(
     return result
 
 
-def _daily_curve(curve: pd.DataFrame) -> pd.DataFrame:
-    """Select each US session's last marked equity for daily risk metrics."""
+def _daily_curve(curve: pd.DataFrame, market: str = "us", session_timezone: str | None = None) -> pd.DataFrame:
+    """Select each session's last marked equity for daily risk metrics."""
     if curve.empty:
         return curve.copy()
     result = curve.copy()
     timestamps = pd.to_datetime(result["timestamp"], utc=True)
-    result["_session_date"] = timestamps.dt.tz_convert(NY_TZ).dt.date
+    tz = session_timezone or (SZ_TZ if market == "sz" else NY_TZ)
+    result["_session_date"] = timestamps.dt.tz_convert(tz).dt.date
     return result.groupby("_session_date", sort=True, as_index=False).tail(1).reset_index(drop=True)
 
 
@@ -249,7 +281,7 @@ def run_backtest(bars: pd.DataFrame, config: BacktestConfig | None = None) -> di
     required = {"timestamp", "symbol", "open", "high", "low", "close", "volume"}
     if not required.issubset(bars.columns):
         raise ValueError(f"bars must contain {sorted(required)}")
-    validated = normalize_ohlcv(bars, source_timezone=None, regular_hours_only=True)
+    validated = normalize_ohlcv(bars, source_timezone=None, regular_hours_only=True, market=cfg.market)
     if validated.empty:
         raise ValueError("no regular-session bars available")
     work = add_sma_signals(validated, cfg.fast_window, cfg.slow_window)
@@ -306,10 +338,10 @@ def run_backtest(bars: pd.DataFrame, config: BacktestConfig | None = None) -> di
 
     equity_curve = pd.DataFrame(curve)
     # Daily close marks avoid treating overnight gaps as ordinary 5-minute returns.
-    metrics = _equity_metrics(_daily_curve(equity_curve), cfg.bars_per_year)
+    metrics = _equity_metrics(_daily_curve(equity_curve, market=cfg.market), cfg.bars_per_year)
     metrics.update(_round_trip_metrics(trades))
     benchmark = _buy_hold_curve(work, cfg)
-    benchmark_metrics = _equity_metrics(_daily_curve(benchmark), cfg.bars_per_year)
+    benchmark_metrics = _equity_metrics(_daily_curve(benchmark, market=cfg.market), cfg.bars_per_year)
     return {
         "config": asdict(cfg),
         "metrics": metrics,
@@ -364,6 +396,64 @@ def split_by_time(bars: pd.DataFrame, train_fraction: float = 0.70) -> tuple[pd.
     if train.empty or test.empty:
         raise ValueError("time split produced an empty partition")
     return train, test
+
+
+# 159502 专用：无已授权五分钟历史时不做真实回测
+def validate_sz159502_backtest_prerequisites(has_authorized_5min_history: bool) -> None:
+    if not has_authorized_5min_history:
+        raise ValueError(
+            "159502 五分钟历史数据未获授权：历史基金接口为日线，高频分钟接口不应被假装为可用；"
+            "当前仅提供离线 Demo，不做真实数据回测"
+        )
+
+
+def run_sz159502_backtest(
+    bars: pd.DataFrame,
+    config: BacktestConfig | None = None,
+    *,
+    has_authorized_5min_history: bool = False,
+) -> dict[str, Any]:
+    """159502 单标的纸面回测：强制校验 5min 授权，允许隔夜，下一根 K 开盘成交。"""
+    validate_sz159502_backtest_prerequisites(has_authorized_5min_history)
+    cfg = config or BacktestConfig(
+        fast_window=20,
+        slow_window=50,
+        initial_cash=100_000.0,
+        per_symbol_equity_fraction=0.10,
+        max_gross_exposure_fraction=0.50,
+        slippage_bps=5.0,
+        commission_per_order=0.0,
+        market="sz",
+        currency="CNY",
+        cost_note="成本为可配置占位值，非真实费率",
+    )
+    # 确保使用深圳时段过滤
+    if bars.empty:
+        raise ValueError("no bars to backtest")
+    # 若调用方已做 normalize，此处复核 SZ 会话
+    validated = normalize_ohlcv(bars, source_timezone=None, regular_hours_only=True, market="sz")
+    return run_backtest(validated, cfg)
+
+
+def demo_sz159502_equity_curve(currency: str = "CNY") -> list[dict[str, Any]]:
+    """离线 Demo：合成 159502 权益曲线，明确标注非实时。"""
+    import math as _math
+    points: list[dict[str, Any]] = []
+    for i in range(48):
+        # 模拟深圳 09:30-15:00 的 5 分钟 bar（剔除午休后合计 48 根）
+        if i < 24:
+            minutes = 9 * 60 + 30 + i * 5
+        else:
+            minutes = 13 * 60 + (i - 24) * 5
+        p = i / 47
+        wave = 220 * _math.sin(p * _math.pi * 6) * _math.sin(p * _math.pi)
+        equity = 100_000 + 1_820 * p + wave
+        points.append({
+            "time": f"{minutes // 60:02d}:{minutes % 60:02d}",
+            "equity": round(equity, 2),
+            "benchmark": round(100_000 + 1_100 * p + 70 * _math.sin(p * _math.pi * 3), 2),
+        })
+    return points
 
 # Kaggle runner appended to shared/quant_core.py by scripts/build_kaggle_artifacts.py.
 # Set SOURCE_TIMEZONE to the timezone documented for the attached CSV before relying
