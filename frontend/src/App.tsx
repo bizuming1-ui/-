@@ -32,8 +32,6 @@ type Dashboard = {
 
 type SZRealtime = {
   symbol: string; name: string; currency: string; price: number; prev_close: number; open: number; high: number; low: number; volume: number;
-  volume_wan_shou: number; turnover: number; turnover_yi: number; limit_up: number; limit_down: number; followers_wan: number;
-  kdj: {k:number;d:number;j:number;params:string}; macd:{dif:number;dea:number;bar:number;params:string}; sample_at:string;
   change: number; change_pct: number; sma_fast: number | null; sma_slow: number | null; signal: string; next_open_estimate: number; next_bar_execution: string;
   timestamp: string; is_demo: boolean; is_realtime_placeholder: boolean; note: string;
   account: SZDashboard['account']; positions: Position[]; engine: SZDashboard['engine'];
@@ -279,50 +277,42 @@ function SZLiveTicker(){
   },[]);
   if(!tick) return <div className="panel" style={{padding:16, background:'linear-gradient(135deg,#081214,#10282c)', border:'1px solid #1c4a52'}}><div style={{display:'flex',alignItems:'center',gap:10,color:'#8ea096'}}><Radio size={14} className="spin"/> 正在连接离线合成脉冲（明确非实时）…</div></div>;
   const up = tick.change >= 0;
-  const isPhotoSample = tick.sample_at === "2026-10-20T11:26:54+08:00";
   return <div className={`panel sz-ticker-panel ${flash ? `flash-${flash}`:''}`} style={{padding:0, overflow:'hidden', border:'1px solid #1c4a52', background:'linear-gradient(180deg,#0a1e22,#081214)'}}>
-    <div style={{padding:'10px 16px 0', display:'flex', justifyContent:'space-between', alignItems:'center', font:'11px ui-monospace', color:'#8ea096'}}>
-      <div><b style={{color:'#e9eeea', fontSize:13}}>{tick.name}</b> · {tick.symbol} 交易中 {new Date(tick.sample_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit', hour12:false}).replace('/','-')} 北京 {isPhotoSample ? <span style={{color:'#e3a857', border:'1px solid #3a3a1a', background:'#2a2410', padding:'1px 6px', borderRadius:999}}>照片样例·离线</span> : <span style={{color:'#7fb0b6'}}>合成脉冲·{tick.note}</span>}</div>
-      <div style={{display:'flex', gap:8, alignItems:'center'}}><span>{tick.followers_wan.toFixed(2)}万球友关注</span><span style={{background:'#e3a857', color:'#081214', padding:'1px 5px', borderRadius:4, fontWeight:700}}>CN L1</span></div>
-    </div>
-    <div style={{display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:0, marginTop:8}}>
-      <div style={{padding:'0 16px 12px', borderRight:'1px solid #143035'}}>
-        <div style={{display:'flex',alignItems:'baseline',gap:10, flexWrap:'wrap'}}>
-          <div style={{fontSize:38, fontWeight:900, letterSpacing:-1, color: up ? '#e35d5d' : '#2e7d32', lineHeight:1}}>{tick.price.toFixed(3)}</div>
-          <div style={{color: up ? '#e35d5d' : '#2e7d32', fontWeight:700}}>{tick.change>=0?'+':''}{tick.change.toFixed(3)} {tick.change_pct>=0?'+':''}{tick.change_pct.toFixed(2)}%</div>
-          <span style={{font:'11px ui-monospace', color:'#8ea096'}}>{new Date(tick.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit', hour12:false})} 上海</span>
+    <div style={{display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:0}}>
+      <div style={{padding:'18px 20px', borderRight:'1px solid #143035'}}>
+        <div style={{font:'11px ui-monospace', color:'#7fb0b6', letterSpacing:.6}}>{tick.symbol} · {tick.name} <span style={{color:'#e3a857',border:'1px solid #3a3a1a',background:'#2a2410',padding:'1px 6px',borderRadius:999,marginLeft:6}}>合成脉冲 · 非实时 · {tick.note}</span></div>
+        <div style={{display:'flex',alignItems:'baseline',gap:12, marginTop:6}}>
+          <div style={{fontSize:42, fontWeight:900, letterSpacing:-1, color: up ? '#a8f06a' : '#ff6b6b', lineHeight:1}}>{tick.price.toFixed(4)} <span style={{fontSize:14, fontWeight:600, color:'#8ea096'}}>{tick.currency}</span></div>
+          <div style={{display:'flex',alignItems:'center',gap:6, background: up ? 'rgba(168,240,106,.12)' : 'rgba(255,107,107,.12)', border:`1px solid ${up?'#2a4a1a':'#4a2a2a'}`, borderRadius:999, padding:'6px 10px'}}>
+            {up ? <ArrowUpRight size={14} color="#a8f06a"/> : <ArrowDownRight size={14} color="#ff6b6b"/>}
+            <span style={{fontWeight:700, color: up?'#a8f06a':'#ff6b6b'}}>{tick.change>=0?'+':''}{tick.change.toFixed(4)} ({tick.change_pct>=0?'+':''}{tick.change_pct.toFixed(2)}%)</span>
+          </div>
+          <span style={{font:'11px ui-monospace', color:'#8ea096'}}>{new Date(tick.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit', hour12:false})} · 上海</span>
         </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginTop:10, fontSize:12}}>
-          <div><span style={{color:'#8ea096'}}>最高</span> <b style={{color:'#e35d5d'}}>{tick.high.toFixed(3)}</b></div>
-          <div><span style={{color:'#8ea096'}}>今开</span> <b>{tick.open.toFixed(3)}</b></div>
-          <div><span style={{color:'#8ea096'}}>最低</span> <b style={{color:'#2e7d32'}}>{tick.low.toFixed(3)}</b></div>
-          <div><span style={{color:'#8ea096'}}>成交量</span> <b>{tick.volume_wan_shou.toFixed(2)}万手</b></div>
-          <div><span style={{color:'#8ea096'}}>昨收</span> <b>{tick.prev_close.toFixed(3)}</b></div>
-          <div><span style={{color:'#8ea096'}}>涨停价</span> <b style={{color:'#e35d5d'}}>{tick.limit_up.toFixed(3)}</b></div>
-          <div><span style={{color:'#8ea096'}}>成交额</span> <b>{tick.turnover_yi.toFixed(2)}亿</b></div>
-          <div><span style={{color:'#8ea096'}}>跌停价</span> <b style={{color:'#2e7d32'}}>{tick.limit_down.toFixed(3)}</b></div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginTop:12}}>
+          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>今开</div><div style={{fontWeight:700}}>{tick.open.toFixed(4)}</div></div>
+          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>最高</div><div style={{fontWeight:700}}>{tick.high.toFixed(4)}</div></div>
+          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>最低</div><div style={{fontWeight:700}}>{tick.low.toFixed(4)}</div></div>
+          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>成交量</div><div style={{fontWeight:700}}>{tick.volume.toLocaleString()}</div></div>
         </div>
-        <div style={{display:'flex', gap:14, marginTop:10, fontSize:12, borderTop:'1px solid #143035', paddingTop:8}}>
-          {['分时','五日','日K','周K','月K','季K','年K','分钟'].map(t=><span key={t} style={{color: t==='日K' ? '#e9eeea' : '#8ea096', borderBottom: t==='日K' ? '2px solid #e9eeea' : 'none', paddingBottom:2}}>{t}{t==='分钟'?'▼':''}</span>)}
-          <span style={{marginLeft:'auto', color:'#8ea096', font:'11px ui-monospace'}}>前复权 ▼</span>
-        </div>
-        <div style={{marginTop:8, display:'flex', gap:8, flexWrap:'wrap', font:'11px ui-monospace', color:'#9fb0b4'}}>
-          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'3px 7px',borderRadius:999}}>KDJ{tick.kdj.params} K:{tick.kdj.k.toFixed(2)} D:{tick.kdj.d.toFixed(2)} J:{tick.kdj.j.toFixed(2)}</span>
-          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'3px 7px',borderRadius:999}}>MACD{tick.macd.params} DIF:{tick.macd.dif.toFixed(2)} DEA:{tick.macd.dea.toFixed(2)} MACD:{tick.macd.bar.toFixed(2)}</span>
-          <span style={{background: tick.signal==='BUY'?'rgba(168,240,106,.12)':tick.signal==='SELL'?'rgba(255,107,107,.12)':'#132a2e',border:'1px solid #1c4a52',padding:'3px 7px',borderRadius:999, color: tick.signal==='BUY'?'#a8f06a':tick.signal==='SELL'?'#ff6b6b':'#bfefff'}}>{tick.signal} · 下一根开盘≈{tick.next_open_estimate.toFixed(3)}</span>
+        <div style={{marginTop:10, display:'flex', gap:8, flexWrap:'wrap', font:'11px ui-monospace', color:'#9fb0b4'}}>
+          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999}}>SMA{tick.sma_fast!=null?` 快:${tick.sma_fast.toFixed(4)}`:''}</span>
+          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999}}>SMA{tick.sma_slow!=null?` 慢:${tick.sma_slow.toFixed(4)}`:''}</span>
+          <span style={{background: tick.signal==='BUY'?'rgba(168,240,106,.12)':tick.signal==='SELL'?'rgba(255,107,107,.12)':'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999, color: tick.signal==='BUY'?'#a8f06a':tick.signal==='SELL'?'#ff6b6b':'#bfefff'}}>{tick.signal} · 下一根开盘≈{tick.next_open_estimate.toFixed(4)}</span>
+          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999}}>{tick.next_bar_execution}</span>
         </div>
       </div>
-      <div style={{padding:'10px 12px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, background:'#0a171a'}}>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>账户权益</div><div style={{fontSize:16,fontWeight:800}}>{new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(tick.account.equity)}</div><div style={{font:'10px ui-monospace',color:'#8ea096'}}>现金 ¥{tick.account.cash.toLocaleString()} · 持仓 ¥{tick.account.portfolio_value.toLocaleString()}</div></div>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>当日/熔断</div><div style={{fontSize:15,fontWeight:800, color: tick.risk.daily_drawdown_pct>0 ? '#ff6b6b' : '#a8f06a'}}>{tick.risk.daily_drawdown_pct>0 ? `-${tick.risk.daily_drawdown_pct.toFixed(2)}%` : `+${(tick.account.equity/tick.risk.initial_equity*100-100).toFixed(2)}%`}</div><div style={{font:'10px ui-monospace',color:'#8ea096'}}>阈值 {tick.risk.daily_loss_limit_pct.toFixed(2)}% · {tick.risk.can_trade ? '可交易' : '已止买'}</div></div>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>持仓</div><div style={{fontSize:12,fontWeight:700}}>{tick.positions.map(p=>`${p.symbol} ${p.qty}股 @${p.avg_entry_price.toFixed(3)}`).join(' · ') || '空仓'}</div><div style={{font:'10px ui-monospace',color:'#8ea096'}}>未实现 {tick.positions.reduce((a,p)=>a+p.unrealized_pl,0).toFixed(2)}</div></div>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>成本占位</div><div style={{fontSize:12,fontWeight:700}}>{tick.cost.slippage_bps}bps</div><div style={{font:'10px ui-monospace',color:'#e3a857'}}>{tick.cost.note}</div></div>
-        <div style={{gridColumn:'1 / -1', background:'#102024', border:'1px solid #1a3a3e', borderRadius:8, padding:'6px 8px', display:'flex', justifyContent:'space-between', font:'10px ui-monospace', color:'#8ea096'}}>
-          <span><i style={{display:'inline-block', width:8, height:8, borderRadius:'50%', background: tick.engine.enabled ? '#a8f06a' : '#e3a857', marginRight:6}}/> {tick.engine.note}</span><span>仅纸面·隔夜·{tick.currency}</span>
+      <div style={{padding:'14px 14px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, background:'#0a171a'}}>
+        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>账户权益</div><div style={{fontSize:18,fontWeight:800}}>{new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(tick.account.equity)}</div><div style={{font:'11px ui-monospace',color:'#8ea096'}}>现金 ¥{tick.account.cash.toLocaleString()} · 持仓 ¥{tick.account.portfolio_value.toLocaleString()}</div></div>
+        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>当日表现</div><div style={{fontSize:18,fontWeight:800, color: tick.risk.daily_drawdown_pct>0 ? '#ff6b6b' : '#a8f06a'}}>{tick.risk.daily_drawdown_pct>0 ? `-${tick.risk.daily_drawdown_pct.toFixed(2)}% 回撤` : `+${(tick.account.equity/tick.risk.initial_equity*100-100).toFixed(2)}%`}</div><div style={{font:'11px ui-monospace',color:'#8ea096'}}>熔断线 {tick.risk.daily_loss_limit_pct.toFixed(2)}% · {tick.risk.can_trade ? '可交易' : '已止买'}</div></div>
+        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>持仓（模拟）</div><div style={{fontSize:14,fontWeight:700}}>{tick.positions.map(p=>`${p.symbol} ${p.qty}股 @${p.avg_entry_price.toFixed(3)}`).join(' · ') || '空仓'}</div><div style={{font:'11px ui-monospace',color:'#8ea096'}}>未实现 {tick.positions.reduce((a,p)=>a+p.unrealized_pl,0).toFixed(2)} CNY</div></div>
+        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>成本（占位）</div><div style={{fontSize:14,fontWeight:700}}>{tick.cost.slippage_bps} bps · {tick.cost.commission_per_order} /笔</div><div style={{font:'11px ui-monospace',color:'#e3a857'}}>{tick.cost.note}</div></div>
+        <div style={{gridColumn:'1 / -1', background:'#102024', border:'1px solid #1a3a3e', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+          <div style={{font:'11px ui-monospace', color:'#8ea096', display:'flex', alignItems:'center', gap:6}}><span className="status-dot" style={{background: tick.engine.enabled ? '#a8f06a' : '#e3a857'}}/> 引擎：{tick.engine.note} · {tick.engine.enabled ? 'ARMED' : 'PAUSED'}</div>
+          <span style={{font:'11px ui-monospace', color:'#8ea096', background:'#0f262a', padding:'4px 8px', borderRadius:999, border:'1px solid #1a3a3e'}}>仅纸面 · 允许隔夜 · {tick.currency}</span>
         </div>
       </div>
     </div>
-    <div style={{padding:'6px 16px', background:'#081214', borderTop:'1px solid #143035', font:'11px ui-monospace', color:'#7fb0b6', display:'flex', gap:12}}><span>Resistance Area / Support · BOS/ChoCh 云带（SMC 示意）</span><span style={{marginLeft:'auto', color:'#8ea096'}}>K线叠加下一根开盘成交标记</span></div>
   </div>;
 }
 

@@ -11,14 +11,14 @@ from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-import random as _random
-import time as _time
-
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
+
+import random as _random
+import time as _time
 
 from backend.app.alpaca_paper import AlpacaPaperClient
 from backend.app.paper_engine import EnginePreflightError, PaperEngine
@@ -30,27 +30,14 @@ from backend.app.tonghuashun_market import demo_5min_bars_note, demo_snapshot, t
 # ── 实时报价合成脉冲（离线 Demo 占位，明确非实时）─────────────────────────
 # 性能说明：热路径由 Python 向量化（numpy/pandas）承载，后续热点可渐进迁 Rust(PyO3)；
 # 行情网关 Go 并发拉取已预留（go_gateway/），此处保持轻量可验证。
-# 照片 2 静态样例（2026-10-20 11:26:54 北京，交易中）：价 1.528 高 1.541 低 1.521 开 1.540 昨收 1.519
-# 涨停 1.671 跌停 1.367 成交量 81.11万手 成交额 1.24亿 KDJ(9,3,3) MACD(12,26,9) —— 仅作界面复刻样例，非实时声称
 _SZ_TICK_STATE: dict[str, float | str] = {
-    "price": 1.528,
-    "prev_close": 1.519,
-    "open": 1.540,
-    "high": 1.541,
-    "low": 1.521,
-    "volume": 811_100.0,  # 81.11万手
-    "turnover": 124_000_000.0,
-    "limit_up": 1.671,
-    "limit_down": 1.367,
-    "followers_wan": 1.09,
-    # 静态样例指标（前端计算为准，此处占位同步照片）
-    "kdj_k": 21.41,
-    "kdj_d": 22.29,
-    "kdj_j": 19.65,
-    "macd_dif": -0.02,
-    "macd_dea": -0.01,
-    "macd_bar": -0.02,
-    "sample_at": "2026-10-20T11:26:54+08:00",
+    "price": 1.045,
+    "prev_close": 1.042,
+    "open": 1.041,
+    "high": 1.055,
+    "low": 1.036,
+    "volume": 1_250_000.0,
+    "turnover": 1_305_000.0,
 }
 from backend.app.security import clear_login_failures, login_rate_limited, record_login_failure, require_authenticated, verify_password
 from backend.app.settings import Settings, get_settings
@@ -434,22 +421,17 @@ async def sz_engine_stop(request: Request) -> dict[str, Any]:
 
 
 def _sz_next_tick_price() -> float:
-    # 复刻照片价位锚定 1.528 ± 随机，照片样例涨跌停 1.671/1.367 为边界
-    base = 1.528
+    # 轻量确定性随机游走：均值回归至 1.045，步长 ±0.004，避免越界
+    base = 1.045
     cur = float(_SZ_TICK_STATE["price"])
-    drift = (base - cur) * 0.03  # 回归照片价
-    step = (_random.random() - 0.5) * 0.008
-    limit_up = float(_SZ_TICK_STATE.get("limit_up", 1.671))
-    limit_down = float(_SZ_TICK_STATE.get("limit_down", 1.367))
-    nxt = max(limit_down + 0.001, min(limit_up - 0.001, cur + drift + step))
+    drift = (base - cur) * 0.03  # 均值回归
+    step = (_random.random() - 0.5) * 0.006
+    nxt = max(0.78, min(1.32, cur + drift + step))
     _SZ_TICK_STATE["price"] = round(nxt, 4)
+    # 更新日内高低
     _SZ_TICK_STATE["high"] = round(max(float(_SZ_TICK_STATE["high"]), nxt), 4)
     _SZ_TICK_STATE["low"] = round(min(float(_SZ_TICK_STATE["low"]), nxt), 4)
     _SZ_TICK_STATE["volume"] = round(float(_SZ_TICK_STATE["volume"]) + _random.randint(8000, 24000), 0)
-    # KDJ/MACD 轻量抖动以演示非实时占位
-    for k in ("kdj_k","kdj_d","kdj_j","macd_dif","macd_dea","macd_bar"):
-        base_v = float(_SZ_TICK_STATE.get(k, 0))
-        _SZ_TICK_STATE[k] = round(base_v + (_random.random()-0.5)*0.08, 2)
     return nxt
 
 def _build_sz_realtime(request: Request) -> dict[str, Any]:
@@ -515,15 +497,7 @@ def _build_sz_realtime(request: Request) -> dict[str, Any]:
         "high": float(_SZ_TICK_STATE["high"]),
         "low": float(_SZ_TICK_STATE["low"]),
         "volume": int(float(_SZ_TICK_STATE["volume"])),
-        "volume_wan_shou": round(float(_SZ_TICK_STATE["volume"])/10000, 2),
         "turnover": float(_SZ_TICK_STATE["turnover"]),
-        "turnover_yi": round(float(_SZ_TICK_STATE["turnover"])/100000000, 2),
-        "limit_up": float(_SZ_TICK_STATE.get("limit_up", 1.671)),
-        "limit_down": float(_SZ_TICK_STATE.get("limit_down", 1.367)),
-        "followers_wan": float(_SZ_TICK_STATE.get("followers_wan", 1.09)),
-        "kdj": {"k": float(_SZ_TICK_STATE.get("kdj_k", 21.41)), "d": float(_SZ_TICK_STATE.get("kdj_d", 22.29)), "j": float(_SZ_TICK_STATE.get("kdj_j", 19.65)), "params": "(9,3,3)"},
-        "macd": {"dif": float(_SZ_TICK_STATE.get("macd_dif", -0.02)), "dea": float(_SZ_TICK_STATE.get("macd_dea", -0.01)), "bar": float(_SZ_TICK_STATE.get("macd_bar", -0.02)), "params": "(12,26,9)"},
-        "sample_at": str(_SZ_TICK_STATE.get("sample_at", "2026-10-20T11:26:54+08:00")),
         "change": round(change, 4),
         "change_pct": round(change_pct, 2),
         "sma_fast": sma_fast,

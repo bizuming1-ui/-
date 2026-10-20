@@ -67,6 +67,7 @@
 
   <div class="notice">同花顺 Playground 手动查询 <code>/api/fund/market/snapshot?thscode=159502.SZ</code> 返回 <code>code=0</code>，但<strong>费用、额度、授权范围尚未确认</strong>。本模拟器<strong>不发起真实 API 调用</strong>，实时轮询默认关闭，Key 仅服务端环境变量可信；历史基金接口为日线，<strong>无已授权 5 分钟历史不做真实回测</strong>，当前为合成离线演示。</div>
 
+<<<<<<< HEAD
   <!-- 大屏实时脉冲（合成占位，明确非实时）— 复刻照片2 行情头 -->
   <div class="card" id="liveTickerCard" style="margin-top:12px; background:linear-gradient(180deg,#0a1e22,#081214); border-color:#1c4a52">
     <div style="padding:8px 14px 0; display:flex; justify-content:space-between; font:11px ui-monospace; color:#8ea096">
@@ -96,6 +97,25 @@
         <div style="margin-top:8px; display:flex; gap:6; flex-wrap:wrap; font:11px ui-monospace; color:#9fb0b4">
           <span id="liveKDJ" style="background:#132a2e; border:1px solid #1c4a52; padding:3px 7px; border-radius:999">KDJ(9,3,3) K:21.41 D:22.29 J:19.65</span>
           <span id="liveMACD" style="background:#132a2e; border:1px solid #1c4a52; padding:3px 7px; border-radius:999">MACD(12,26,9) DIF:-0.02 DEA:-0.01 MACD:-0.02</span>
+=======
+  <!-- 大屏实时脉冲（合成占位，明确非实时） -->
+  <div class="card" id="liveTickerCard" style="margin-top:12px; background:linear-gradient(180deg,#0a1e22,#081214); border-color:#1c4a52">
+    <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:0">
+      <div style="padding:16px 16px; border-right:1px solid #143035">
+        <div style="font:11px ui-monospace; color:#7fb0b6">159502.SZ · 嘉实标普生物科技精选行业 ETF（QDII） <span style="color:#e3a857; border:1px solid #3a3a1a; background:#2a2410; padding:2px 8px; border-radius:999; margin-left:6px">合成脉冲 · 非实时 · 成本占位</span></div>
+        <div style="display:flex; align-items:baseline; gap:10; margin-top:6px; flex-wrap:wrap">
+          <div id="livePrice" style="font-size:38px; font-weight:900; letter-spacing:-1px; color:#a8f06a">1.0450 <span style="font-size:13px; color:#8ea096">CNY</span></div>
+          <div id="liveChange" style="display:flex; align-items:center; gap:6; background:rgba(168,240,106,.12); border:1px solid #2a4a1a; border-radius:999px; padding:6px 10px; font-weight:700; color:#a8f06a">+0.0030 (+0.29%)</div>
+          <span id="liveTime" style="font:11px ui-monospace; color:#8ea096">--:--:-- · 上海</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8; margin-top:10px">
+          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">今开</div><div id="liveOpen" style="font-weight:700">1.0410</div></div>
+          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">最高</div><div id="liveHigh" style="font-weight:700">1.0550</div></div>
+          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">最低</div><div id="liveLow" style="font-weight:700">1.0360</div></div>
+          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">成交量</div><div id="liveVolume" style="font-weight:700">1,250,000</div></div>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:6; flex-wrap:wrap; font:11px ui-monospace; color:#9fb0b4">
+>>>>>>> origin/arena/cf6082b3-repo
           <span id="liveSMAFast" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">SMA 快: --</span>
           <span id="liveSMASlow" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">SMA 慢: --</span>
           <span id="liveSignal" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">HOLD</span>
@@ -111,12 +131,15 @@
     </div>
   </div>
 
+<<<<<<< HEAD
   <!-- SMC K线（照片1：BOS/ChoCh/阻力/趋势线/云带） -->
   <div class="card" style="margin-top:10px">
     <div class="card-h"><h2>SMC 结构 · BOS/ChoCh/阻力区</h2><span class="kicker">Resistance / Support · 云带</span></div>
     <div class="body" style="padding:10px"><div class="chart-wrap" style="height:240px"><canvas id="smcChart" width="900" height="280"></canvas></div><div style="font:11px ui-monospace; color:#8ea096; margin-top:6px">绿带=Resistance/Support · 黄虚线=bos 红虚线=ChoCh 斜虚线=压制线 云带=SMA快慢带（后续Ichimoku）— 仅示意</div></div>
   </div>
 
+=======
+>>>>>>> origin/arena/cf6082b3-repo
   <div class="grid" style="margin-top:12px">
     <div class="card">
       <div class="card-h"><h2>参数 · 离线可调</h2><span class="kicker">SZSE 09:30-11:30/13:00-15:00</span></div>
@@ -532,6 +555,7 @@ function drawChart(equityCurve, benchCurve){
   // store for tooltip?
   chartData = {toX,toY,min,max,W,H,equityCurve,benchCurve};
 }
+<<<<<<< HEAD
 function drawSMC(bars){
   const canvas=$('smcChart'); if(!canvas) return; const ctx=canvas.getContext('2d'); const dpr=window.devicePixelRatio||1; const rect=canvas.getBoundingClientRect(); canvas.width=rect.width*dpr; canvas.height=rect.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); const W=rect.width,H=rect.height; ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a171a'; ctx.fillRect(0,0,W,H);
   if(!bars.length) return;
@@ -558,6 +582,8 @@ function drawSMC(bars){
   // Trendline (downward)
   const startIdx=Math.max(0,bars.length-30), endIdx=bars.length-1; const startY=toY(highs[startIdx]*1.02), endY=toY(lows[endIdx]*0.98); ctx.strokeStyle='#7fb0b6'; ctx.setLineDash([4,4]); ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(toX(startIdx),startY); ctx.lineTo(toX(endIdx),endY); ctx.stroke(); ctx.setLineDash([]);
 }
+=======
+>>>>>>> origin/arena/cf6082b3-repo
 
 // tooltip simple
 $('chart').addEventListener('mousemove', (e)=>{
@@ -652,7 +678,10 @@ function doRun(){
   window.__result = result;
   window.__bench = bench;
   window.__bars = bars;
+<<<<<<< HEAD
   try{ drawSMC(bars); }catch(e){}
+=======
+>>>>>>> origin/arena/cf6082b3-repo
 }
 
 $('runBtn').addEventListener('click', doRun);
@@ -683,6 +712,7 @@ $('csvFile').addEventListener('change', async (e)=>{
   } catch(err){ alert('CSV 解析失败: '+ err.message); }
 });
 
+<<<<<<< HEAD
 // ── 大屏实时脉冲（合成占位，与前端 SZLiveTicker 同口径，明确非实时）— 照片价 1.528 锚定 ──
 let tickPrice = 1.528, tickPrevClose=1.519, tickOpen=1.540, tickHigh=1.541, tickLow=1.521, tickVolume=811100, tickTurnover=124000000, tickLimitUp=1.671, tickLimitDown=1.367;
 let tickKDJ_K=21.41, tickKDJ_D=22.29, tickKDJ_J=19.65, tickMACD_DIF=-0.02, tickMACD_DEA=-0.01, tickMACD_BAR=-0.02;
@@ -698,6 +728,18 @@ function tickNext(){
   // KDJ/MACD 轻抖
   tickKDJ_K += (Math.random()-0.5)*0.08; tickKDJ_D += (Math.random()-0.5)*0.08; tickKDJ_J += (Math.random()-0.5)*0.08;
   tickMACD_DIF += (Math.random()-0.5)*0.01; tickMACD_DEA += (Math.random()-0.5)*0.01; tickMACD_BAR += (Math.random()-0.5)*0.01;
+=======
+// ── 大屏实时脉冲（合成占位，与前端 SZLiveTicker 同口径，明确非实时） ──
+let tickPrice = 1.045, tickPrevClose=1.042, tickOpen=1.041, tickHigh=1.055, tickLow=1.036, tickVolume=1250000;
+let tickLastUpdate = Date.now();
+function tickNext(){
+  const drift = (1.045 - tickPrice)*0.03;
+  const step = (Math.random()-0.5)*0.006;
+  tickPrice = Math.max(0.78, Math.min(1.32, tickPrice + drift + step));
+  tickHigh = Math.max(tickHigh, tickPrice);
+  tickLow  = Math.min(tickLow, tickPrice);
+  tickVolume += Math.floor(Math.random()*16000)+8000;
+>>>>>>> origin/arena/cf6082b3-repo
   tickLastUpdate = Date.now();
   // SMA from last bars tail + tick
   try{
@@ -709,6 +751,7 @@ function tickNext(){
     const prevClose = tickPrevClose;
     const chg = tickPrice - prevClose, chgPct = prevClose? chg/prevClose*100 : 0;
     const up = chg>=0;
+<<<<<<< HEAD
     // DOM — 中式红涨绿跌复刻照片2
     const priceEl = $('livePrice'); priceEl.style.color = up ? '#e35d5d' : '#2e7d32';
     priceEl.innerHTML = tickPrice.toFixed(3) + ' <span style="font-size:13px; color:#8ea096">CNY</span>';
@@ -725,6 +768,18 @@ function tickNext(){
     if($('liveMACD')) $('liveMACD').textContent = `MACD(12,26,9) DIF:${tickMACD_DIF.toFixed(2)} DEA:${tickMACD_DEA.toFixed(2)} MACD:${tickMACD_BAR.toFixed(2)}`;
     $('liveSMAFast').textContent = `SMA 快: ${sFast!=null?sFast.toFixed(3):'--'}`;
     $('liveSMASlow').textContent = `SMA 慢: ${sSlow!=null?sSlow.toFixed(3):'--'}`;
+=======
+    // DOM
+    const priceEl = $('livePrice'); priceEl.style.color = up ? 'var(--accent2)' : 'var(--danger)';
+    priceEl.innerHTML = tickPrice.toFixed(4) + ' <span style="font-size:13px; color:#8ea096">CNY</span>';
+    const chEl = $('liveChange'); chEl.style.color = up?'#a8f06a':'#ff6b6b'; chEl.style.background = up?'rgba(168,240,106,.12)':'rgba(255,107,107,.12)'; chEl.style.borderColor = up?'#2a4a1a':'#4a2a2a';
+    chEl.textContent = `${chg>=0?'+':''}${chg.toFixed(4)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
+    $('liveOpen').textContent = tickOpen.toFixed(4); $('liveHigh').textContent = tickHigh.toFixed(4); $('liveLow').textContent = tickLow.toFixed(4);
+    $('liveVolume').textContent = tickVolume.toLocaleString();
+    $('liveTime').textContent = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) + ' · 上海';
+    $('liveSMAFast').textContent = `SMA 快: ${sFast!=null?sFast.toFixed(4):'--'}`;
+    $('liveSMASlow').textContent = `SMA 慢: ${sSlow!=null?sSlow.toFixed(4):'--'}`;
+>>>>>>> origin/arena/cf6082b3-repo
     const sigEl=$('liveSignal'); sigEl.textContent = sig + ' · 下一根开盘≈' + (sig==='BUY'? (tickPrice*1.0005).toFixed(4) : sig==='SELL'? (tickPrice*0.9995).toFixed(4) : tickPrice.toFixed(4));
     sigEl.style.color = sig==='BUY'?'#a8f06a':sig==='SELL'?'#ff6b6b':'#bfefff';
     // 同步持仓/权益小卡（与回测结果联动：持仓量取 lastPositions，权益按当前价重算）

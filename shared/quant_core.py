@@ -432,6 +432,7 @@ def run_sz159502_backtest(
     return run_backtest(validated, cfg)
 
 
+<<<<<<< HEAD
 def calc_kdj(bars: pd.DataFrame, n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
     """KDJ(9,3,3) 计算，适配照片样例；仅用已收盘 bar，无未来。"""
     need = {"high","low","close"}
@@ -487,6 +488,8 @@ def detect_smc_structure(bars: pd.DataFrame, lookback: int = 5) -> dict[str, lis
     if choch: support.append({"price": min(c["price"] for c in choch[-3:]), "label": "Support"})
     return {"bos": bos[-6:], "choch": choch[-4:], "resistance": resistance, "support": support}
 
+=======
+>>>>>>> origin/arena/cf6082b3-repo
 def demo_sz159502_equity_curve(currency: str = "CNY") -> list[dict[str, Any]]:
     """离线 Demo：合成 159502 权益曲线，明确标注非实时。"""
     import math as _math
