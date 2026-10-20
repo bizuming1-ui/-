@@ -11,6 +11,9 @@ from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+import random as _random
+import time as _time
+
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
@@ -19,6 +22,36 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from backend.app.alpaca_paper import AlpacaPaperClient
 from backend.app.paper_engine import EnginePreflightError, PaperEngine
+from backend.app.sz_market_client import SZPaperMarketClient
+from backend.app.sz_portfolio import SZPortfolioStore
+from backend.app.sz159502_engine import SZ159502Engine, SZEnginePreflightError
+from backend.app.tonghuashun_market import demo_5min_bars_note, demo_snapshot, tonghuashun_status
+
+# ── 实时报价合成脉冲（离线 Demo 占位，明确非实时）─────────────────────────
+# 性能说明：热路径由 Python 向量化（numpy/pandas）承载，后续热点可渐进迁 Rust(PyO3)；
+# 行情网关 Go 并发拉取已预留（go_gateway/），此处保持轻量可验证。
+# 照片 2 静态样例（2026-10-20 11:26:54 北京，交易中）：价 1.528 高 1.541 低 1.521 开 1.540 昨收 1.519
+# 涨停 1.671 跌停 1.367 成交量 81.11万手 成交额 1.24亿 KDJ(9,3,3) MACD(12,26,9) —— 仅作界面复刻样例，非实时声称
+_SZ_TICK_STATE: dict[str, float | str] = {
+    "price": 1.528,
+    "prev_close": 1.519,
+    "open": 1.540,
+    "high": 1.541,
+    "low": 1.521,
+    "volume": 811_100.0,  # 81.11万手
+    "turnover": 124_000_000.0,
+    "limit_up": 1.671,
+    "limit_down": 1.367,
+    "followers_wan": 1.09,
+    # 静态样例指标（前端计算为准，此处占位同步照片）
+    "kdj_k": 21.41,
+    "kdj_d": 22.29,
+    "kdj_j": 19.65,
+    "macd_dif": -0.02,
+    "macd_dea": -0.01,
+    "macd_bar": -0.02,
+    "sample_at": "2026-10-20T11:26:54+08:00",
+}
 from backend.app.security import clear_login_failures, login_rate_limited, record_login_failure, require_authenticated, verify_password
 from backend.app.settings import Settings, get_settings
 from backend.app.store import StateStore
@@ -50,6 +83,15 @@ async def lifespan(app: FastAPI):
     app.state.store = store
     app.state.alpaca = None
     app.state.engine = None
+    # SZ 159502 纸面模拟器：离线优先，不默认轮询；Key 仅服务端环境变量
+    app.state.sz_portfolio = SZPortfolioStore(settings.database_path, settings)
+    # 预构建 Demo 5min bars 用于离线演示（合成、非真实）
+    try:
+        demo_bars = SZPaperMarketClient.build_demo_bars(days=3, symbol=settings.sz159502_symbol)
+    except Exception:
+        demo_bars = None
+    app.state.sz_client = SZPaperMarketClient(settings, app.state.sz_portfolio, ths_client=None, demo_bars=demo_bars)
+    app.state.sz_engine = SZ159502Engine(settings, app.state.sz_client, store)
     if settings.app_mode == "paper":
         client = AlpacaPaperClient(settings)
         engine = PaperEngine(settings, client, store)
@@ -61,6 +103,8 @@ async def lifespan(app: FastAPI):
     yield
     if app.state.engine:
         await app.state.engine.shutdown()
+    if getattr(app.state, "sz_engine", None):
+        await app.state.sz_engine.shutdown()
     logger.info("Quant Desk API stopped")
 
 
@@ -124,6 +168,13 @@ def health(request: Request) -> dict[str, Any]:
         "mode": settings.app_mode,
         "market_data_feed": "Alpaca IEX" if settings.app_mode == "paper" else "Demo fixture",
         "paper_only": True,
+        "sz159502": {
+            "symbol": settings.sz159502_symbol,
+            "currency": settings.sz159502_currency,
+            "poll_enabled": settings.sz159502_poll_enabled,
+            "has_authorized_5min_history": settings.sz159502_has_authorized_5min_history,
+            "demo_labeled": True,
+        },
     }
 
 
@@ -291,6 +342,219 @@ def kaggle_notebook() -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="Kaggle Notebook 正在生成")
     return FileResponse(path, media_type="application/x-ipynb+json", filename="quant_research.ipynb")
+
+
+@app.get("/api/sz159502/status", dependencies=[Depends(_auth)])
+def sz_status(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    return tonghuashun_status(settings)
+
+
+@app.get("/api/sz159502/snapshot", dependencies=[Depends(_auth)])
+def sz_snapshot(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    # 离线 Demo 快照：清晰标注非实时；真实接口仅在 tonghuashun_enabled 且有 Key 时按需调用（此处不自动触发）
+    return demo_snapshot(settings)
+
+
+@app.get("/api/sz159502/bars-note", dependencies=[Depends(_auth)])
+def sz_bars_note(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    return demo_5min_bars_note(settings)
+
+
+@app.get("/api/sz159502/demo-dashboard", dependencies=[Depends(_auth)])
+async def sz_demo_dashboard(request: Request) -> dict[str, Any]:
+    settings = _settings(request)
+    # 159502 离线纸面仪表板：¥100,000 初始、10% 单笔、2% 日熔断（止新买+尝试卖出）、占位成本、允许隔夜
+    portfolio = request.app.state.sz_portfolio
+    # 用合成 demo bars 计算展示用权益曲线（非真实回测）
+    from shared.quant_core import demo_sz159502_equity_curve
+    equity_curve = demo_sz159502_equity_curve()
+    account = portfolio.account_snapshot()
+    positions = portfolio.positions()
+    # 若无持仓，补充一个演示持仓示例以展示界面（明确 demo）
+    if not positions:
+        positions = [
+            {"symbol": settings.sz159502_symbol, "qty": 800, "side": "long", "avg_entry_price": 1.021, "current_price": 1.045, "market_value": 836.0, "unrealized_pl": 19.2, "unrealized_plpc": 0.0235},
+        ]
+        # 调整权益以自洽
+        account = {**account, "equity": 101820.0, "portfolio_value": 836.0, "cash": 100984.0}
+    return {
+        "mode": "demo",
+        "offline": True,
+        "symbol": settings.sz159502_symbol,
+        "name": settings.sz159502_name,
+        "market": settings.sz159502_market,
+        "timezone": settings.sz159502_timezone,
+        "currency": settings.sz159502_currency,
+        "feed": "离线演示 · 非实时行情 · 未获授权 5 分钟真实数据不作回测",
+        "disclaimer": "纸面模拟 · 合成演示 · 不构成投资建议",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "account": account,
+        "positions": positions,
+        "strategy": {"fast_window": settings.fast_window, "slow_window": settings.slow_window, "bar_minutes": 5, "side": "long-only", "execution": "下一根可交易 K 开盘成交", "overnight": "允许隔夜"},
+        "risk": {
+            "initial_equity": settings.sz159502_initial_equity,
+            "per_trade_fraction": settings.sz159502_per_trade_fraction,
+            "daily_loss_limit_fraction": settings.sz159502_daily_loss_limit_fraction,
+            "behavior": "日回撤 2% 后停止新买入并尝试卖出可卖持仓",
+        },
+        "cost": {"slippage_bps": settings.sz159502_slippage_bps, "commission_per_order": settings.sz159502_commission_per_order, "note": settings.sz159502_cost_note, "is_placeholder": True},
+        "engine": request.app.state.sz_engine.status(),
+        "equity_curve": equity_curve,
+        "orders": portfolio.recent_orders(10),
+        "unverified": ["同花顺 Playground code=0 待确认费用/额度/授权", "历史基金接口日线；159502 五分钟历史未授权不回测", "实时轮询默认关闭；Key 仅服务端环境变量"],
+    }
+
+
+@app.post("/api/sz159502/engine/start", dependencies=[Depends(_auth)])
+async def sz_engine_start(request: Request, payload: StartRequest = StartRequest()) -> dict[str, Any]:
+    _csrf(request)
+    settings = _settings(request)
+    engine: SZ159502Engine = request.app.state.sz_engine
+    if not settings.sz159502_poll_enabled:
+        raise HTTPException(status_code=409, detail="159502 实时轮询默认关闭；请先确认授权与风控后再显式开启（当前为离线 Demo）")
+    previous = engine.status()
+    if previous.get("paused_reason") == "daily_loss_limit" and not payload.acknowledge_risk:
+        raise HTTPException(status_code=409, detail="当日回撤熔断已触发；请先阅读风险提示并明确确认")
+    try:
+        return await engine.start(acknowledge_risk=payload.acknowledge_risk)
+    except SZEnginePreflightError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/sz159502/engine/stop", dependencies=[Depends(_auth)])
+async def sz_engine_stop(request: Request) -> dict[str, Any]:
+    _csrf(request)
+    engine: SZ159502Engine | None = getattr(request.app.state, "sz_engine", None)
+    if engine is None:
+        return {"enabled": False, "note": "演示模式；没有订单引擎"}
+    return await engine.stop()
+
+
+def _sz_next_tick_price() -> float:
+    # 复刻照片价位锚定 1.528 ± 随机，照片样例涨跌停 1.671/1.367 为边界
+    base = 1.528
+    cur = float(_SZ_TICK_STATE["price"])
+    drift = (base - cur) * 0.03  # 回归照片价
+    step = (_random.random() - 0.5) * 0.008
+    limit_up = float(_SZ_TICK_STATE.get("limit_up", 1.671))
+    limit_down = float(_SZ_TICK_STATE.get("limit_down", 1.367))
+    nxt = max(limit_down + 0.001, min(limit_up - 0.001, cur + drift + step))
+    _SZ_TICK_STATE["price"] = round(nxt, 4)
+    _SZ_TICK_STATE["high"] = round(max(float(_SZ_TICK_STATE["high"]), nxt), 4)
+    _SZ_TICK_STATE["low"] = round(min(float(_SZ_TICK_STATE["low"]), nxt), 4)
+    _SZ_TICK_STATE["volume"] = round(float(_SZ_TICK_STATE["volume"]) + _random.randint(8000, 24000), 0)
+    # KDJ/MACD 轻量抖动以演示非实时占位
+    for k in ("kdj_k","kdj_d","kdj_j","macd_dif","macd_dea","macd_bar"):
+        base_v = float(_SZ_TICK_STATE.get(k, 0))
+        _SZ_TICK_STATE[k] = round(base_v + (_random.random()-0.5)*0.08, 2)
+    return nxt
+
+def _build_sz_realtime(request: Request) -> dict[str, Any]:
+    settings: Settings = request.app.state.settings
+    nxt_price = _sz_next_tick_price()
+    prev_close = float(_SZ_TICK_STATE["prev_close"])
+    change = nxt_price - prev_close
+    change_pct = (change / prev_close * 100) if prev_close else 0.0
+    # 从 demo bars 取最近 50 根计算 SMA（纯 Python 向量化，后续可切 Rust）
+    try:
+        demo_bars = getattr(request.app.state.sz_client, "demo_bars", None)
+        if demo_bars is not None and hasattr(demo_bars, "__len__") and len(demo_bars) > 0:
+            import pandas as pd
+            closes = demo_bars["close"].tail(50).tolist() if hasattr(demo_bars, "iloc") else []
+            closes.append(nxt_price)
+            # 简化 SMA：取最后 20/50
+            def _sma(vals, w):
+                if len(vals) < w:
+                    return None
+                return round(sum(vals[-w:]) / w, 4)
+            sma_fast = _sma(closes, settings.fast_window)
+            sma_slow = _sma(closes, settings.slow_window)
+            if sma_fast is not None and sma_slow is not None:
+                signal = "BUY" if sma_fast > sma_slow else "SELL" if sma_fast < sma_slow else "HOLD"
+            else:
+                signal = "HOLD"
+        else:
+            sma_fast = round(nxt_price * 0.998, 4)
+            sma_slow = round(nxt_price * 1.002, 4)
+            signal = "HOLD"
+    except Exception:
+        sma_fast, sma_slow, signal = None, None, "HOLD"
+    portfolio = getattr(request.app.state, "sz_portfolio", None)
+    account = portfolio.account_snapshot() if portfolio else {"equity": 101820, "cash": 100984, "portfolio_value": 836, "currency": "CNY"}
+    positions = portfolio.positions() if portfolio else []
+    # 若空仓，展示合成示例以保持大屏饱满（明确 demo）
+    if not positions:
+        positions = [{"symbol": settings.sz159502_symbol, "qty": 800, "side": "long", "avg_entry_price": 1.021, "current_price": nxt_price, "market_value": round(800 * nxt_price, 2), "unrealized_pl": round(800 * (nxt_price - 1.021), 2), "unrealized_plpc": round((nxt_price / 1.021 - 1), 4)}]
+    engine = getattr(request.app.state, "sz_engine", None)
+    eng_state = engine.status() if engine else {"enabled": False, "note": "离线 Demo"}
+    account_equity = float(account.get("equity", 100000))
+    initial = float(settings.sz159502_initial_equity)
+    daily_ret = (account_equity / initial - 1) * 100 if initial else 0.0
+    dd = max(0.0, -daily_ret) if daily_ret < 0 else 0.0
+    drawdown_pct = round(dd, 2)
+    can_trade = dd < float(settings.sz159502_daily_loss_limit_fraction) * 100
+    # 下一根开盘估算（当前价 + 滑点占位）
+    slip = float(settings.sz159502_slippage_bps) / 10_000
+    next_open_est = round(nxt_price * (1 + slip) if signal == "BUY" else nxt_price * (1 - slip) if signal == "SELL" else nxt_price, 4)
+    return {
+        "symbol": settings.sz159502_symbol,
+        "name": settings.sz159502_name,
+        "currency": settings.sz159502_currency,
+        "market": settings.sz159502_market,
+        "timezone": settings.sz159502_timezone,
+        "is_demo": True,
+        "is_realtime_placeholder": True,
+        "note": "合成脉冲 · 离线演示 · 非实时行情 · 成本占位",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "price": nxt_price,
+        "prev_close": prev_close,
+        "open": float(_SZ_TICK_STATE["open"]),
+        "high": float(_SZ_TICK_STATE["high"]),
+        "low": float(_SZ_TICK_STATE["low"]),
+        "volume": int(float(_SZ_TICK_STATE["volume"])),
+        "volume_wan_shou": round(float(_SZ_TICK_STATE["volume"])/10000, 2),
+        "turnover": float(_SZ_TICK_STATE["turnover"]),
+        "turnover_yi": round(float(_SZ_TICK_STATE["turnover"])/100000000, 2),
+        "limit_up": float(_SZ_TICK_STATE.get("limit_up", 1.671)),
+        "limit_down": float(_SZ_TICK_STATE.get("limit_down", 1.367)),
+        "followers_wan": float(_SZ_TICK_STATE.get("followers_wan", 1.09)),
+        "kdj": {"k": float(_SZ_TICK_STATE.get("kdj_k", 21.41)), "d": float(_SZ_TICK_STATE.get("kdj_d", 22.29)), "j": float(_SZ_TICK_STATE.get("kdj_j", 19.65)), "params": "(9,3,3)"},
+        "macd": {"dif": float(_SZ_TICK_STATE.get("macd_dif", -0.02)), "dea": float(_SZ_TICK_STATE.get("macd_dea", -0.01)), "bar": float(_SZ_TICK_STATE.get("macd_bar", -0.02)), "params": "(12,26,9)"},
+        "sample_at": str(_SZ_TICK_STATE.get("sample_at", "2026-10-20T11:26:54+08:00")),
+        "change": round(change, 4),
+        "change_pct": round(change_pct, 2),
+        "sma_fast": sma_fast,
+        "sma_slow": sma_slow,
+        "signal": signal,
+        "next_open_estimate": next_open_est,
+        "next_bar_execution": "下一根可交易 K 开盘成交（深圳 09:30-11:30/13:00-15:00）",
+        "account": account,
+        "positions": positions,
+        "engine": eng_state,
+        "risk": {"initial_equity": initial, "daily_drawdown_pct": drawdown_pct, "daily_loss_limit_pct": float(settings.sz159502_daily_loss_limit_fraction) * 100, "can_trade": can_trade, "behavior": "2% 止新买并尝试卖出"},
+        "cost": {"slippage_bps": settings.sz159502_slippage_bps, "commission_per_order": settings.sz159502_commission_per_order, "note": settings.sz159502_cost_note, "is_placeholder": True},
+        "orders": portfolio.recent_orders(8) if portfolio else [],
+        "unverified": ["同花顺 Playground code=0 待确认费用/额度", "历史基金接口日线；无授权 5min 不回测", "轮询默认关闭；Key 仅服务端环境变量"],
+    }
+
+@app.get("/api/sz159502/realtime", dependencies=[Depends(_auth)])
+def sz_realtime(request: Request) -> dict[str, Any]:
+    return _build_sz_realtime(request)
+
+@app.get("/api/sz159502/ticker", dependencies=[Depends(_auth)])
+def sz_ticker(request: Request) -> dict[str, Any]:
+    snap = _build_sz_realtime(request)
+    return {k: snap[k] for k in ("symbol","price","prev_close","open","high","low","volume","change","change_pct","timestamp","sma_fast","sma_slow","signal","is_demo")}
+
+@app.get("/api/sz159502/engine/status", dependencies=[Depends(_auth)])
+def sz_engine_status(request: Request) -> dict[str, Any]:
+    engine = getattr(request.app.state, "sz_engine", None)
+    if not engine:
+        return {"enabled": False, "note": "演示模式；未连接行情"}
+    return engine.status()
 
 
 def _demo_dashboard(settings: Settings) -> dict[str, Any]:

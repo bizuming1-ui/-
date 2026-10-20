@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>159502 纸面模拟器 · 浏览器离线版</title>
+<style>
+  :root{--bg:#081214;--panel:#101c1f;--panel2:#0e262a;--line:#1d3a3e;--text:#e9eeea;--muted:#8ea096;--accent:#7cc4ff;--accent2:#a8f06a;--warn:#e3a857;--danger:#e35d5d;--radius:16px}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  a{color:var(--accent)} .wrap{max-width:1100px;margin:0 auto;padding:18px 14px 40px}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,rgba(8,18,20,.98),rgba(8,18,20,.92) 70%,transparent);backdrop-filter:saturate(1.2) blur(6px);padding:14px 0 10px;margin:-10px 0 10px}
+  .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#0f2a2f,#17464d);display:grid;place-items:center;font-weight:900;letter-spacing:.5px;border:1px solid #1c4a52}
+  .logo b{color:var(--accent)}
+  h1{margin:0;font-size:18px;line-height:1.2} h1 em{font-style:normal;color:var(--accent2)} .sub{color:var(--muted);font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #1c4a52;background:#0f2023;color:#bfefff;border-radius:999px;padding:4px 10px;font:12px/1 ui-monospace,monospace}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);box-shadow:0 0 0 6px rgba(168,240,106,.12)}
+  .grid{display:grid;grid-template-columns:320px 1fr;gap:14px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .card-h{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .card-h h2{margin:0;font-size:13px;letter-spacing:.2px}
+  .kicker{font:11px/1 ui-monospace,monospace;color:#7fb0b6;letter-spacing:.6px}
+  .body{padding:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{font-size:12px;color:var(--muted);display:grid;gap:6px}
+  input,select,button{font:14px system-ui} input,select{width:100%;background:#0b1a1d;border:1px solid #1e3a3e;color:var(--text);border-radius:10px;padding:9px 10px}
+  input:focus,select:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+  .btn{appearance:none;border:1px solid #2b4d52;background:#122a2e;color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+  .btn.primary{background:linear-gradient(180deg,#0f2a2f,#0e3a41);border-color:#2f6b74;color:#dff5ff}
+  .btn:active{transform:translateY(1px)}
+  .notice{border:1px dashed #2a4a50;background:#0a1f23;color:#bfe3e8;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.5}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:900px){.metrics{grid-template-columns:1fr 1fr}}
+  .metric{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .metric .label{font:11px ui-monospace;color:var(--muted)} .metric .val{font-size:18px;font-weight:800;margin:4px 0}
+  .metric .foot{font-size:11px;color:var(--muted)}
+  .chart-wrap{height:280px;background:#0a171a;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+  canvas{width:100%;height:100%;display:block}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font:11px ui-monospace;color:var(--muted);margin-top:8px}
+  .legend i{width:12px;height:3px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:6px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:7px 8px;border-bottom:1px solid #153235;text-align:left;white-space:nowrap}
+  th{color:var(--muted);font-weight:600}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .tag{border:1px solid #2b4d52;border-radius:999px;padding:2px 8px;font:11px ui-monospace}
+  .tag.buy{background:rgba(168,240,106,.12);color:#c9ffb0} .tag.sell{background:rgba(255,107,107,.12);color:#ffb3b3}
+  .progress{height:8px;background:#0a1a1d;border:1px solid #1a3a3e;border-radius:999px;overflow:hidden}
+  .progress span{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),#5ee1a8);transition:width .3s}
+  details{border-top:1px solid var(--line)} details summary{cursor:pointer;padding:10px 14px;color:var(--muted);list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  .footer{color:var(--muted);font:11px ui-monospace;text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo"><b>159502</b></div>
+      <div>
+        <h1>嘉实标普生物科技精选行业 ETF（QDII）<em> · 纸面模拟器</em></h1>
+        <div class="sub">浏览器离线版 · 5 分钟 SMA20/50 · 只做多 · 下一根可交易 K 开盘成交 · 允许隔夜 · 初始 ¥100,000 · 单笔 ≤10% · 日熔断 2% 止新买并尝试卖出 · 成本为<strong style="color:var(--warn)">可配置占位值，非真实费率</strong></div>
+      </div>
+      <span class="pill"><span class="dot"></span>离线 Demo · 非实时行情 · 不构成投资建议</span>
+    </div>
+  </header>
+
+  <div class="notice">同花顺 Playground 手动查询 <code>/api/fund/market/snapshot?thscode=159502.SZ</code> 返回 <code>code=0</code>，但<strong>费用、额度、授权范围尚未确认</strong>。本模拟器<strong>不发起真实 API 调用</strong>，实时轮询默认关闭，Key 仅服务端环境变量可信；历史基金接口为日线，<strong>无已授权 5 分钟历史不做真实回测</strong>，当前为合成离线演示。</div>
+
+  <!-- 大屏实时脉冲（合成占位，明确非实时）— 复刻照片2 行情头 -->
+  <div class="card" id="liveTickerCard" style="margin-top:12px; background:linear-gradient(180deg,#0a1e22,#081214); border-color:#1c4a52">
+    <div style="padding:8px 14px 0; display:flex; justify-content:space-between; font:11px ui-monospace; color:#8ea096">
+      <div><b style="color:#e9eeea; font-size:13px">标普生物科技ETF嘉实</b> 159502 <span style="color:#7fb0b6">交易中 10-20 11:26:54 北京</span> <span style="color:#e3a857; border:1px solid #3a3a1a; background:#2a2410; padding:1px 6px; border-radius:999">照片样例·离线</span></div>
+      <div>1.09万球友关注 <span style="background:#e3a857; color:#081214; padding:1px 5px; border-radius:4; font-weight:700">CN L1</span></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:0; margin-top:6px">
+      <div style="padding:10px 14px; border-right:1px solid #143035">
+        <div style="display:flex; align-items:baseline; gap:10; flex-wrap:wrap">
+          <div id="livePrice" style="font-size:36px; font-weight:900; letter-spacing:-1px; color:#e35d5d">1.528 <span style="font-size:13px; color:#8ea096">CNY</span></div>
+          <div id="liveChange" style="color:#e35d5d; font-weight:700">+0.009 +0.59%</div>
+          <span id="liveTime" style="font:11px ui-monospace; color:#8ea096">--:--:-- · 上海</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6; margin-top:8px; font-size:12px">
+          <div><span style="color:#8ea096">最高</span> <b id="liveHigh" style="color:#e35d5d">1.541</b></div>
+          <div><span style="color:#8ea096">今开</span> <b id="liveOpen">1.540</b></div>
+          <div><span style="color:#8ea096">最低</span> <b id="liveLow" style="color:#2e7d32">1.521</b></div>
+          <div><span style="color:#8ea096">成交量</span> <b id="liveVolume">81.11万手</b></div>
+          <div><span style="color:#8ea096">昨收</span> <b id="livePrevClose">1.519</b></div>
+          <div><span style="color:#8ea096">涨停价</span> <b id="liveLimitUp" style="color:#e35d5d">1.671</b></div>
+          <div><span style="color:#8ea096">成交额</span> <b id="liveTurnover">1.24亿</b></div>
+          <div><span style="color:#8ea096">跌停价</span> <b id="liveLimitDown" style="color:#2e7d32">1.367</b></div>
+        </div>
+        <div style="display:flex; gap:12; margin-top:8px; font-size:12px; border-top:1px solid #143035; padding-top:6px">
+          <span>分时</span><span>五日</span><span style="color:#e9eeea; border-bottom:2px solid #e9eeea">日K</span><span>周K</span><span>月K</span><span>季K</span><span>年K</span><span>分钟▼</span><span style="margin-left:auto; color:#8ea096; font:11px ui-monospace">前复权 ▼</span>
+        </div>
+        <div style="margin-top:8px; display:flex; gap:6; flex-wrap:wrap; font:11px ui-monospace; color:#9fb0b4">
+          <span id="liveKDJ" style="background:#132a2e; border:1px solid #1c4a52; padding:3px 7px; border-radius:999">KDJ(9,3,3) K:21.41 D:22.29 J:19.65</span>
+          <span id="liveMACD" style="background:#132a2e; border:1px solid #1c4a52; padding:3px 7px; border-radius:999">MACD(12,26,9) DIF:-0.02 DEA:-0.01 MACD:-0.02</span>
+          <span id="liveSMAFast" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">SMA 快: --</span>
+          <span id="liveSMASlow" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">SMA 慢: --</span>
+          <span id="liveSignal" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">HOLD</span>
+          <span style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">下一根 K 开盘成交 · 深圳 09:30-11:30/13:00-15:00</span>
+        </div>
+      </div>
+      <div style="padding:12px; display:grid; grid-template-columns:1fr 1fr; gap:8; background:#0a171a">
+        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">账户权益（模拟）</div><div id="liveEquity" style="font-size:16px; font-weight:800">¥101,820.00</div><div id="liveCash" style="font:11px ui-monospace; color:#8ea096">现金 -- · 持仓 --</div></div>
+        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">当日</div><div id="liveDaily" style="font-size:16px; font-weight:800">+1.82%</div><div id="liveRisk" style="font:11px ui-monospace; color:#8ea096">熔断线 2.00%</div></div>
+        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">持仓</div><div id="livePos" style="font-size:13px; font-weight:700">159502.SZ 800股 @1.021</div><div id="liveUpl" style="font:11px ui-monospace; color:#8ea096">未实现 --</div></div>
+        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">成本（占位）</div><div id="liveCost" style="font-size:13px; font-weight:700">5 bps · 0 /笔</div><div style="font:11px ui-monospace; color:#e3a857">成本为可配置占位值，非真实费率</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SMC K线（照片1：BOS/ChoCh/阻力/趋势线/云带） -->
+  <div class="card" style="margin-top:10px">
+    <div class="card-h"><h2>SMC 结构 · BOS/ChoCh/阻力区</h2><span class="kicker">Resistance / Support · 云带</span></div>
+    <div class="body" style="padding:10px"><div class="chart-wrap" style="height:240px"><canvas id="smcChart" width="900" height="280"></canvas></div><div style="font:11px ui-monospace; color:#8ea096; margin-top:6px">绿带=Resistance/Support · 黄虚线=bos 红虚线=ChoCh 斜虚线=压制线 云带=SMA快慢带（后续Ichimoku）— 仅示意</div></div>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <div class="card">
+      <div class="card-h"><h2>参数 · 离线可调</h2><span class="kicker">SZSE 09:30-11:30/13:00-15:00</span></div>
+      <div class="body" style="display:grid;gap:12px">
+        <div class="row">
+          <label>初始虚拟资金（CNY）<input id="initial" type="number" value="100000" step="1000"/></label>
+          <label>单笔仓位上限（%权益）<input id="perTrade" type="number" value="10" step="1"/></label>
+        </div>
+        <div class="row">
+          <label>日回撤熔断（%）<input id="dailyLimit" type="number" value="2" step="0.5"/></label>
+          <label>总敞口上限（%）<input id="maxGross" type="number" value="50" step="5"/></label>
+        </div>
+        <div class="row">
+          <label>SMA 快线<input id="fast" type="number" value="20" min="1"/></label>
+          <label>SMA 慢线<input id="slow" type="number" value="50" min="2"/></label>
+        </div>
+        <div class="row">
+          <label>滑点（bps/边，占位）<input id="slippage" type="number" value="5" step="1"/></label>
+          <label>佣金（每笔，占位）<input id="commission" type="number" value="0" step="0.1"/></label>
+        </div>
+        <div class="notice" style="margin:0">成本为<strong>可配置占位值，非真实费率</strong>，仅用于演示买卖对权益的影响，不代表券商真实成交。</div>
+        <div style="display:grid;gap:8px">
+          <label>上传 CSV（可选，timestamp/open/high/low/close/volume）<input id="csvFile" type="file" accept=".csv,.txt"/></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" id="runBtn">▶ 运行离线回测</button>
+            <button class="btn" id="demoBtn">生成 3 天合成 Demo</button>
+            <button class="btn" id="exportTradesBtn">导出 Trades CSV</button>
+            <button class="btn" id="exportEquityBtn">导出权益 CSV</button>
+          </div>
+          <div class="kicker">CSV 时区：若无时区，默认视为 Asia/Shanghai；含 Z/±HH:MM 按 UTC 解析。仅保留 09:30-11:25 与 13:00-14:55 的 5 分钟 bar（深圳常规时段）。</div>
+        </div>
+        <details open>
+          <summary>如何使用（点击收起）</summary>
+          <div class="body" style="padding-top:0;color:var(--muted);font-size:12px;line-height:1.6">
+            1）直接点“运行”即用合成 Demo（非真实行情）演示策略、风控与成本占位；2）或上传你的 159502 五分钟 CSV（需已获授权，否则不建议声称为真实回测）；3）调参后重复运行，对比权益曲线与基准（Buy & Hold 50%）。
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:12px">
+      <div class="card">
+        <div class="card-h"><h2>权益曲线 · 已完成 bar 触发、下一根开盘成交</h2><button class="btn" id="refreshBtn">刷新 Demo 数据</button></div>
+        <div class="body">
+          <div class="metrics" id="metrics"></div>
+          <div class="chart-wrap" style="margin-top:12px"><canvas id="chart" width="920" height="320"></canvas></div>
+          <div class="legend"><span><i style="background:var(--accent)"></i>纸面权益</span><span><i style="background:#7581e5; border-top:1px dashed #7581e5"></i>Buy&Hold 基准（50%）</span><span>允许隔夜 · 不追补缺口 · 整股向下取整</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>风控 · 当日 2% 熔断止新买并尝试卖出</h2><span class="kicker" id="riskKicker">ARMED</span></div>
+        <div class="body">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)"><span>当日回落</span><b id="ddValue">0.00%</b></div>
+          <div class="progress" style="margin:6px 0 8px"><span id="ddBar" style="width:0%"></span></div>
+          <div style="display:flex;justify-content:space-between;font:11px ui-monospace;color:var(--muted)"><span id="ddNote">相对今日 0 点基线</span><span>熔断阈值 2.00%</span></div>
+          <div class="notice" id="riskNote" style="margin-top:10px">未触发熔断：新买入正常放行；触发后将拦截 BUY，并在同轮尝试以占位成本卖出可卖持仓，需人工确认后方可恢复。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card">
+      <div class="card-h"><h2>当前纸面持仓</h2><span class="kicker" id="posCount">0</span></div>
+      <div class="body" style="padding:0">
+        <div style="overflow:auto;max-height:260px">
+          <table id="posTable"><thead><tr><th>标的</th><th>数量</th><th>均价</th><th>最新</th><th>市值</th><th>未实现</th></tr></thead><tbody><tr><td colspan="6" style="text-align:center;color:var(--muted)">暂无持仓（运行后显示）</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>交易记录</h2><span class="kicker" id="tradeCount">0 笔</span></div>
+      <div class="body" style="padding:0">
+        <div style="overflow:auto;max-height:260px">
+          <table id="tradeTable"><thead><tr><th>时间</th><th>方向</th><th>数量</th><th>价格（含占位滑点）</th><th>费用</th><th>权益</th></tr></thead><tbody><tr><td colspan="6" style="text-align:center;color:var(--muted)">暂无交易（运行后显示）</td></tr></tbody></table>
+        </div>
+        <div style="padding:10px 12px;color:var(--muted);font-size:11px">成交价 = 开盘价 ×(1±滑点)；费用 = 滑点等效 + 占位佣金；不代表真实券商费率。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="card-h"><h2>回测说明 · 未验证事项</h2><button class="btn" onclick="navigator.clipboard.writeText(location.href)">复制本页链接</button></div>
+    <div class="body" style="color:var(--muted);font-size:12px;line-height:1.7">
+      <div>• <b>159502.SZ 深圳 ETF（QDII）</b> 单标的纸面模拟，CNY 计价，深圳 09:30-11:30/13:00-15:00，5 分钟已完成 bar 触发，下一根可交易 K 开盘成交，允许隔夜。</div>
+      <div>• <b>风控：</b>初始 ¥100,000，单笔 ≤10%，日回撤 2% 止新买并尝试卖出可卖持仓（非一刀切全停），需人工确认后恢复；本页为离线模拟，自动在当日触发后拦截 BUY 并在同轮写入 SELL 尝试。</div>
+      <div>• <b>成本：</b>滑点/佣金为可配置占位值，前端卡片与导出 CSV 均标注“PLACEHOLDER”；不声称为真实费率，不用于投资建议。</div>
+      <div>• <b>数据：</b>同花顺 <code>/api/fund/market/snapshot?thscode=159502.SZ</code> Playground 返回 code=0 仅作记录，费用/额度/授权未确认；历史基金接口为日线，无已授权 159502 五分钟历史不做真实回测，本页合成 Demo 明确非实时。</div>
+      <div>• <b>Key 安全：</b>若接入真实接口，Key 仅服务端环境变量 <code>TONGHUASHUN_API_KEY</code>，前端/浏览器存储/Notebook/GitHub/聊天均不得保存。</div>
+    </div>
+  </div>
+
+  <div class="footer">离线 Demo · 仅研究与界面演示 · 不构成投资建议 · 159502-browser-simulator.html 可直接本地打开或随仓库分发</div>
+</div>
+
+<script>
+// ----- helpers -----
+const $ = (id)=>document.getElementById(id);
+const fmtMoney = (n, ccy='CNY')=> new Intl.NumberFormat(ccy==='CNY'?'zh-CN':'en-US',{style:'currency',currency:ccy,maximumFractionDigits:2}).format(n);
+const pct = (n)=> `${n>=0?'+':''}${n.toFixed(2)}%`;
+let lastEquityCurve=[], lastTrades=[], lastRunConfig={}, lastPositions=[];
+
+// SZ session: 09:30-11:25 and 13:00-14:55
+function isSZBarOpenLocal(dateInShanghai){
+  const minutes = dateInShanghai.getHours()*60 + dateInShanghai.getMinutes();
+  return (minutes>=9*60+30 && minutes<=11*60+25) || (minutes>=13*60 && minutes<=14*60+55);
+}
+function toShanghaiDate(ts){
+  // ts is JS Date in UTC, convert to Shanghai
+  return new Date(ts.toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
+}
+function parseCSV(text){
+  const lines = text.trim().split(/\r?\n/);
+  if(!lines.length) throw new Error('CSV 空');
+  const header = lines[0].split(',').map(s=>s.trim().toLowerCase());
+  const idx = (name)=> header.findIndex(h=>h===name || h.replace(/_/g,'')===name);
+  let tsIdx = header.findIndex(h=>['timestamp','datetime','date','time'].includes(h));
+  if(tsIdx<0) throw new Error('缺少 timestamp/datetime 列');
+  const openIdx = header.findIndex(h=>h==='open'); const highIdx=header.findIndex(h=>h==='high'); const lowIdx=header.findIndex(h=>h==='low'); const closeIdx=header.findIndex(h=>h==='close'); const volIdx=header.findIndex(h=>h==='volume');
+  if([openIdx,highIdx,lowIdx,closeIdx,volIdx].some(v=>v<0)) throw new Error('缺少 open/high/low/close/volume');
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const cols = lines[i].split(',').map(s=>s.trim());
+    const tsRaw = cols[tsIdx];
+    let ts = new Date(tsRaw);
+    // if timestamp without zone, treat as Shanghai
+    if(isNaN(ts) || (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(tsRaw))){
+      // try as Shanghai local
+      // parse as 2024-01-02 09:30
+      const m = tsRaw.match(/(\d{4})[-\/](\d{2})[-\/](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+      if(m){
+        const [_,Y,M,D,h,mi,s] = m;
+        const sh = new Date(`${Y}-${M}-${D}T${h}:${mi}:${s||'00'}+08:00`);
+        ts = sh;
+      }
+    }
+    if(isNaN(ts)) continue;
+    const open=parseFloat(cols[openIdx]), high=parseFloat(cols[highIdx]), low=parseFloat(cols[lowIdx]), close=parseFloat(cols[closeIdx]), volume=parseFloat(cols[volIdx]);
+    if(!isFinite(open)||!isFinite(high)||!isFinite(low)||!isFinite(close)||!isFinite(volume)) continue;
+    rows.push({timestamp: ts, open, high, low, close, volume, symbol:'159502.SZ'});
+  }
+  if(!rows.length) throw new Error('无有效行');
+  // filter RTH SZ
+  const filtered = rows.filter(r=>{
+    const sh = toShanghaiDate(r.timestamp);
+    return isSZBarOpenLocal(sh);
+  });
+  if(!filtered.length) throw new Error('无深圳常规时段 bar（09:30-11:30/13:00-15:00）');
+  filtered.sort((a,b)=> a.timestamp - b.timestamp);
+  return filtered;
+}
+
+function genDemo(days=3){
+  const rows=[];
+  // build 3 days *48 bars =144
+  const baseShanghai = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
+  baseShanghai.setHours(9,30,0,0);
+  // start days-1 before today
+  let close = 1.02;
+  for(let d=0; d<days; d++){
+    const dayOffset = days-1 - d;
+    const day = new Date(baseShanghai); day.setDate(day.getDate()-dayOffset);
+    for(let i=0;i<48;i++){
+      let sh;
+      if(i<24) sh = new Date(day), sh.setHours(9,30,0,0), sh.setMinutes(30+i*5);
+      else sh = new Date(day), sh.setHours(13,0,0,0), sh.setMinutes((i-24)*5);
+      // local -> UTC Date
+      const ts = new Date(sh.toLocaleString('en-US',{timeZone:'UTC'}));
+      // reconstruct correctly: create via +08:00
+      const pad=(n)=>String(n).padStart(2,'0');
+      const isoSh = `${sh.getFullYear()}-${pad(sh.getMonth()+1)}-${pad(sh.getDate())}T${pad(sh.getHours())}:${pad(sh.getMinutes())}:00+08:00`;
+      const utc = new Date(isoSh);
+      const idx = d*48 + i;
+      const cycle = Math.sin(idx/9)*0.5 + Math.sin(idx/23)*0.3;
+      const trend = (idx%70<35? 0.0009 : -0.0009);
+      close = Math.max(0.75, close + trend + cycle*0.001 + ((idx%7)-3)*0.0004);
+      const open = close - 0.0008;
+      const high = Math.max(open,close)+0.0025;
+      const low = Math.min(open,close)-0.0025;
+      const volume = 900000 + (idx%10)*80000;
+      rows.push({timestamp: utc, open, high, low, close, volume, symbol:'159502.SZ'});
+    }
+  }
+  rows.sort((a,b)=> a.timestamp-b.timestamp);
+  return rows;
+}
+
+// SMA
+function sma(arr, window){
+  const out = new Array(arr.length).fill(null);
+  let sum=0;
+  for(let i=0;i<arr.length;i++){
+    sum += arr[i];
+    if(i>=window) sum -= arr[i-window];
+    if(i>=window-1) out[i]= sum/window;
+  }
+  return out;
+}
+
+function runBacktest(bars, cfg){
+  // bars: array of {timestamp, open, high, low, close, volume}
+  // cfg: {fast,slow,initialCash,perTradeFraction,maxGrossFraction,slippageBps,commission,dailyLimit}
+  const closes = bars.map(b=>b.close);
+  const fast = sma(closes, cfg.fast);
+  const slow = sma(closes, cfg.slow);
+  // daily baseline by Shanghai date
+  let cash = cfg.initialCash;
+  let positionQty = 0;
+  let avgPrice = 0;
+  let lastEquity = cfg.initialCash;
+  const dailyBaseline = new Map(); // dateStr -> equity start
+  const equityCurve = [];
+  const trades = [];
+  let dailyHalted = false;
+  let haltReason = '';
+  let grossExposureAtHalt = 0;
+
+  const getShanghaiDateStr = (ts)=> {
+    const sh = toShanghaiDate(ts);
+    return `${sh.getFullYear()}-${String(sh.getMonth()+1).padStart(2,'0')}-${String(sh.getDate()).padStart(2,'0')}`;
+  };
+
+  // precompute signals per bar (only completed bars)
+  const signals = new Array(bars.length).fill('HOLD');
+  for(let i=0;i<bars.length;i++){
+    if(fast[i]==null || slow[i]==null) continue;
+    if(i===0) continue;
+    const prevFast = fast[i-1], prevSlow = slow[i-1];
+    if(prevFast==null || prevSlow==null) continue;
+    if(prevFast <= prevSlow && fast[i] > slow[i]) signals[i]='BUY';
+    else if(prevFast >= prevSlow && fast[i] < slow[i]) signals[i]='SELL';
+  }
+
+  // we need pending signal execution at next bar open
+  let pending = null; // {side, barIndexTriggered}
+  for(let i=0;i<bars.length;i++){
+    const bar = bars[i];
+    const shDate = getShanghaiDateStr(bar.timestamp);
+    if(!dailyBaseline.has(shDate)){
+      // daily baseline is equity at start of day (prev close)
+      dailyBaseline.set(shDate, cash + positionQty * (i>0? bars[i-1].close : bar.close));
+    }
+    const baseline = dailyBaseline.get(shDate);
+    const currentEquityMark = cash + positionQty * bar.open; // mark at open before execution
+    if(currentEquityMark <= baseline * (1 - cfg.dailyLimit)){
+      if(!dailyHalted){
+        dailyHalted = true; haltReason = `达到当日 ${(cfg.dailyLimit*100).toFixed(2)}% 回撤熔断；已停止新买入并尝试卖出可卖持仓`;
+        grossExposureAtHalt = positionQty * bar.close;
+      }
+    }
+
+    // execute pending at this bar open
+    if(pending){
+      const px = bar.open;
+      const slip = cfg.slippageBps / 10000;
+      if(pending.side==='BUY' && positionQty===0){
+        if(dailyHalted){
+          // block BUY but allow risk sell attempt later
+          // record blocked event as no trade
+        } else {
+          const equityForSizing = cash + positionQty * bar.open; // for single instrument, same as cash+MV
+          const maxGross = equityForSizing * cfg.maxGrossFraction;
+          const currentGross = positionQty * bar.open;
+          const grossCap = Math.max(0, maxGross - currentGross);
+          const targetCash = Math.min(equityForSizing * cfg.perTradeFraction, grossCap, cash);
+          const fill = px * (1 + slip);
+          const qty = Math.floor(Math.max(0, targetCash - cfg.commission) / fill);
+          if(qty>=1){
+            const cost = qty * fill + cfg.commission;
+            if(cost <= cash + 1e-9){
+              cash -= cost;
+              const newQty = positionQty + qty;
+              avgPrice = (positionQty * avgPrice + qty * fill) / newQty;
+              positionQty = newQty;
+              trades.push({timestamp: bar.timestamp, symbol:'159502.SZ', side:'BUY', qty, price: fill, commission: cfg.commission, equity: cash + positionQty*bar.close, note:'SMA上穿'});
+            }
+          }
+        }
+      } else if(pending.side==='SELL' && positionQty>0){
+        const qty = positionQty;
+        const fill = px * (1 - slip);
+        const proceeds = qty * fill - cfg.commission;
+        cash += proceeds;
+        trades.push({timestamp: bar.timestamp, symbol:'159502.SZ', side:'SELL', qty, price: fill, commission: cfg.commission, equity: cash, note:'SMA下穿'});
+        positionQty = 0; avgPrice = 0;
+      }
+      pending = null;
+    }
+
+    // after execution, check if we should schedule next signal from this completed bar
+    const sig = signals[i];
+    if(sig==='BUY' && positionQty===0 && !dailyHalted){
+      pending = {side:'BUY', barIndexTriggered:i};
+    } else if(sig==='SELL' && positionQty>0){
+      pending = {side:'SELL', barIndexTriggered:i};
+    } else if(dailyHalted && positionQty>0 && sig==='HOLD'){
+      // risk attempt: try to sell even without SELL signal, once per halt day at next bar
+      // we schedule a SELL as risk attempt if not already pending
+      // but only if we have not already tried risk sell today
+      // simplified: schedule risk SELL at this bar's next open (if no other signal)
+      if(!pending) pending = {side:'SELL', barIndexTriggered:i, risk:true};
+    }
+
+    // if halted and we have a pending SELL (risk), it will be allowed even though BUY blocked
+
+    const equity = cash + positionQty * bar.close;
+    equityCurve.push({timestamp: bar.timestamp, equity, cash, gross: positionQty*bar.close, close: bar.close});
+    lastEquity = equity;
+  }
+
+  // metrics
+  // daily equity for drawdown/sharpe
+  const dailyMap = new Map();
+  for(const pt of equityCurve){
+    const d = getShanghaiDateStr(pt.timestamp);
+    dailyMap.set(d, pt.equity);
+  }
+  const dailyEq = Array.from(dailyMap.values());
+  let totalReturn = dailyEq.length? (dailyEq[dailyEq.length-1]/dailyEq[0]-1):0;
+  let maxDrawdown = 0, peak = dailyEq[0]||cfg.initialCash;
+  for(const v of dailyEq){ if(v>peak) peak=v; const dd = v/peak-1; if(dd<maxDrawdown) maxDrawdown=dd; }
+  const returns = [];
+  for(let i=1;i<dailyEq.length;i++) returns.push(dailyEq[i]/dailyEq[i-1]-1);
+  const avgRet = returns.length? returns.reduce((a,b)=>a+b,0)/returns.length : 0;
+  const stdev = returns.length>1? Math.sqrt(returns.reduce((a,b)=>a+(b-avgRet)**2,0)/(returns.length-1)) : 0;
+  const sharpe = stdev? (avgRet/stdev)*Math.sqrt(252) : null;
+  // round-trip
+  let realized=[], entries=[];
+  // simplistic: pair BUY/SELL in order
+  let entry=null;
+  for(const t of trades){
+    if(t.side==='BUY') entry = {price:t.price, qty:t.qty, commission:t.commission};
+    else if(t.side==='SELL' && entry){
+      const pnl = (t.price - entry.price)* Math.min(t.qty, entry.qty) - entry.commission - t.commission;
+      realized.push(pnl); entry=null;
+    }
+  }
+  const wins = realized.filter(v=>v>0).length;
+  const winRate = realized.length? wins/realized.length : null;
+  const profitFactor = (()=>{
+    const winSum = realized.filter(v=>v>0).reduce((a,b)=>a+b,0);
+    const lossSum = Math.abs(realized.filter(v=>v<0).reduce((a,b)=>a+b,0));
+    if(!lossSum) return winSum? Infinity : null;
+    return winSum/lossSum;
+  })();
+
+  return {
+    equityCurve, trades, positionQty, avgPrice, cash, equity: lastEquity,
+    metrics:{totalReturn, maxDrawdown, sharpe, winRate, profitFactor, closedTrades: realized.length, dailyPoints: dailyEq.length},
+    halted: dailyHalted, haltReason, dailyBaseline
+  };
+}
+
+// benchmark: buy & hold 50%
+function buyHold(bars, cfg){
+  const investable = cfg.initialCash * cfg.maxGrossFraction;
+  const firstOpen = bars[0].open;
+  const fill = firstOpen * (1 + cfg.slippageBps/10000);
+  const qty = Math.floor(Math.max(0, investable - cfg.commission)/fill);
+  let cash = cfg.initialCash - (qty*fill + (qty?cfg.commission:0));
+  const curve=[];
+  for(const b of bars){
+    const eq = cash + qty * b.close;
+    curve.push(eq);
+  }
+  return {qty, cash, curve};
+}
+
+// chart
+let chartCtx=null, chartData=null;
+function drawChart(equityCurve, benchCurve){
+  const canvas = $('chart'); const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio||1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width*dpr; canvas.height=rect.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0,0,W,H);
+  // background grid
+  ctx.fillStyle='#0a171a'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(let y=0;y<H;y+=40){ ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W,y); ctx.stroke();}
+  // find bounds
+  const all = equityCurve.map(p=>p.equity).concat(benchCurve);
+  let min = Math.min(...all), max = Math.max(...all);
+  const pad = (max-min)*0.08 || 500;
+  min-=pad; max+=pad;
+  const toX = (i)=> 40 + (i/(equityCurve.length-1))*(W-50);
+  const toY = (v)=> H-30 - ((v-min)/(max-min))*(H-50);
+  // benchmark
+  ctx.strokeStyle='#7581e5'; ctx.setLineDash([4,5]); ctx.lineWidth=1.4; ctx.beginPath();
+  benchCurve.forEach((v,i)=>{ const x=toX(i), y=toY(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.stroke(); ctx.setLineDash([]);
+  // equity
+  // fill
+  ctx.fillStyle='rgba(124,196,255,0.18)'; ctx.beginPath();
+  equityCurve.forEach((p,i)=>{ const x=toX(i), y=toY(p.equity); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.lineTo(toX(equityCurve.length-1), H-30); ctx.lineTo(toX(0), H-30); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#7cc4ff'; ctx.lineWidth=2; ctx.beginPath();
+  equityCurve.forEach((p,i)=>{ const x=toX(i), y=toY(p.equity); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);}); ctx.stroke();
+  // axes labels
+  ctx.fillStyle='#8ea096'; ctx.font='10px ui-monospace'; ctx.textAlign='right';
+  ctx.fillText(fmtMoney(max,'CNY'), 38, 14); ctx.fillText(fmtMoney(min,'CNY'), 38, H-34);
+  // time labels (sparse)
+  ctx.textAlign='center'; ctx.fillStyle='#657d80';
+  const step = Math.max(1, Math.floor(equityCurve.length/6));
+  for(let i=0;i<equityCurve.length;i+=step){
+    const ts = equityCurve[i].timestamp;
+    const sh = toShanghaiDate(ts);
+    const label = `${String(sh.getHours()).padStart(2,'0')}:${String(sh.getMinutes()).padStart(2,'0')}`;
+    ctx.fillText(label, toX(i), H-10);
+  }
+  // store for tooltip?
+  chartData = {toX,toY,min,max,W,H,equityCurve,benchCurve};
+}
+function drawSMC(bars){
+  const canvas=$('smcChart'); if(!canvas) return; const ctx=canvas.getContext('2d'); const dpr=window.devicePixelRatio||1; const rect=canvas.getBoundingClientRect(); canvas.width=rect.width*dpr; canvas.height=rect.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); const W=rect.width,H=rect.height; ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a171a'; ctx.fillRect(0,0,W,H);
+  if(!bars.length) return;
+  const highs=bars.map(b=>b.high), lows=bars.map(b=>b.low); let min=Math.min(...lows), max=Math.max(...highs); const pad=(max-min)*0.12||0.02; min-=pad; max+=pad;
+  const toX=i=> 40+(i/(bars.length-1))*(W-50); const toY=v=> H-30 - ((v-min)/(max-min))*(H-50);
+  // cloud (SMA快慢带)
+  const closes=bars.map(b=>b.close); const sma=(arr,w)=>{const o=new Array(arr.length).fill(null); let s=0; for(let i=0;i<arr.length;i++){s+=arr[i]; if(i>=w) s-=arr[i-w]; if(i>=w-1) o[i]=s/w;} return o;}; const fSma=sma(closes,20), sSma=sma(closes,50);
+  ctx.fillStyle='rgba(168,240,106,0.10)'; ctx.beginPath(); let started=false; for(let i=0;i<bars.length;i++){ if(fSma[i]==null||sSma[i]==null) continue; const x=toX(i); if(!started){ctx.moveTo(x,toY(fSma[i])); started=true;} else ctx.lineTo(x,toY(fSma[i]));} for(let i=bars.length-1;i>=0;i--){ if(fSma[i]==null||sSma[i]==null) continue; ctx.lineTo(toX(i),toY(sSma[i]));} ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(255,107,107,0.08)'; // bear cloud where price below slow
+  // candlesticks
+  const bw=Math.max(2, (W-50)/bars.length*0.6);
+  for(let i=0;i<bars.length;i++){ const b=bars[i]; const x=toX(i); const oY=toY(b.open), cY=toY(b.close), hY=toY(b.high), lY=toY(b.low); const up=b.close>=b.open; ctx.strokeStyle= up?'#a8f06a':'#e35d5d'; ctx.fillStyle= up?'#a8f06a':'#e35d5d'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x,hY); ctx.lineTo(x,lY); ctx.stroke(); const y=Math.min(oY,cY), h=Math.max(2,Math.abs(cY-oY)); ctx.fillRect(x-bw/2,y,bw,h); }
+  // BOS / ChoCh markers (simple pivot)
+  const swingH=Math.max(...highs.slice(-20)); const swingL=Math.min(...lows.slice(-20));
+  ctx.setLineDash([6,6]); ctx.strokeStyle='#e3a857'; ctx.lineWidth=1; // bos
+  const bosIdx=bars.findIndex((b,i)=> i>10 && b.high>swingH*0.998); if(bosIdx>=0){ const y=toY(bars[bosIdx].high); ctx.beginPath(); ctx.moveTo(toX(bosIdx),y); ctx.lineTo(toX(Math.min(bars.length-1,bosIdx+6)),y); ctx.stroke(); ctx.fillStyle='#e3a857'; ctx.font='10px ui-monospace'; ctx.fillText('bos', toX(bosIdx)+4, y-4); }
+  ctx.strokeStyle='#e35d5d'; const choIdx=bars.findIndex((b,i)=> i>10 && b.low<swingL*1.002); if(choIdx>=0){ const y=toY(bars[choIdx].low); ctx.beginPath(); ctx.moveTo(toX(choIdx),y); ctx.lineTo(toX(Math.min(bars.length-1,choIdx+6)),y); ctx.stroke(); ctx.fillStyle='#e35d5d'; ctx.fillText('ChoCh', toX(choIdx)+4, y+10); }
+  ctx.setLineDash([]);
+  // Resistance Area green band
+  const resTop=Math.max(...highs.slice(-12)); const resBot=resTop*0.985;
+  ctx.fillStyle='rgba(168,240,106,0.14)'; ctx.fillRect(toX(bars.length-20), toY(resTop), toX(bars.length-1)-toX(bars.length-20), toY(resBot)-toY(resTop)); ctx.fillStyle='#a8f06a'; ctx.font='11px system-ui'; ctx.fillText('Resistance Area', toX(bars.length-18), toY(resTop)-6);
+  // Support arrow (photo1)
+  const supLow=Math.min(...lows.slice(0,10)); ctx.fillStyle='rgba(168,240,106,0.10)'; ctx.fillRect(10,toY(supLow)-4,80,8); ctx.fillStyle='#8ea096'; ctx.font='10px ui-monospace'; ctx.fillText('Support', 12, H-12);
+  // Trendline (downward)
+  const startIdx=Math.max(0,bars.length-30), endIdx=bars.length-1; const startY=toY(highs[startIdx]*1.02), endY=toY(lows[endIdx]*0.98); ctx.strokeStyle='#7fb0b6'; ctx.setLineDash([4,4]); ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(toX(startIdx),startY); ctx.lineTo(toX(endIdx),endY); ctx.stroke(); ctx.setLineDash([]);
+}
+
+// tooltip simple
+$('chart').addEventListener('mousemove', (e)=>{
+  if(!chartData) return;
+  const rect = e.target.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  // find nearest index
+  const idx = Math.round((x-40)/(chartData.W-50)*(chartData.equityCurve.length-1));
+  if(idx<0||idx>=chartData.equityCurve.length) return;
+  // could show tooltip div
+});
+
+// state
+let bars = genDemo(3);
+let benchCache=null;
+
+function updateMetrics(result, bench){
+  const m = $('metrics');
+  const total = result.metrics.totalReturn*100;
+  const dd = Math.abs(result.metrics.maxDrawdown*100);
+  const sharpe = result.metrics.sharpe;
+  const winRate = result.metrics.winRate;
+  m.innerHTML = `
+    <div class="metric"><div class="label">账户权益（CNY）</div><div class="val">${fmtMoney(result.equity,'CNY')}</div><div class="foot">现金 ${fmtMoney(result.cash,'CNY')} · 持仓 ${result.positionQty} 股</div></div>
+    <div class="metric"><div class="label">区间收益</div><div class="val" style="color:${total>=0?'var(--accent2)':'var(--danger)'}">${pct(total)}</div><div class="foot">仅合成演示，非真实绩效</div></div>
+    <div class="metric"><div class="label">最大回撤</div><div class="val">-${dd.toFixed(2)}%</div><div class="foot">日收盘计，252 年化口径</div></div>
+    <div class="metric"><div class="label">Sharpe / 胜率</div><div class="val">${sharpe!=null?sharpe.toFixed(2):'—'} <span style="font-size:12px;color:var(--muted)">${winRate!=null? (winRate*100).toFixed(1)+'%':''}</span></div><div class="foot">成本占位 · 不代表真实</div></div>
+  `;
+  // risk
+  const dailyLimit = parseFloat($('dailyLimit').value)/100;
+  const equityStart = parseFloat($('initial').value);
+  const ddCurrent = result.equity/equityStart -1 <0 ? Math.abs(result.equity/equityStart-1)*100 : 0;
+  $('ddValue').textContent = `-${ddCurrent.toFixed(2)}%`;
+  $('ddBar').style.width = Math.min(ddCurrent/(dailyLimit*100)*100,100)+'%';
+  $('ddBar').style.background = ddCurrent >= dailyLimit*100*0.8 ? 'var(--danger)' : 'var(--accent2)';
+  $('riskKicker').textContent = result.halted? '熔断暂停':'ARMED';
+  $('riskNote').textContent = result.halted ? result.haltReason : '未触发熔断：新买入正常放行；触发后将拦截 BUY，并在同轮尝试卖出可卖持仓，需人工确认后恢复。';
+  $('riskNote').style.borderColor = result.halted ? '#5a2a2a' : '';
+}
+
+function renderTables(result){
+  const posBody = document.querySelector('#posTable tbody');
+  if(result.positionQty>0){
+    const avg = result.avgPrice, qty = result.positionQty, lastClose = bars[bars.length-1].close, mv = qty*lastClose, upl = (lastClose-avg)*qty;
+    posBody.innerHTML = `<tr><td><b>159502.SZ</b><div style="color:var(--muted);font-size:11px">嘉实标普生物科技精选行业 ETF（QDII）</div></td><td class="mono">${qty}</td><td class="mono">${fmtMoney(avg,'CNY')}</td><td class="mono">${fmtMoney(lastClose,'CNY')}</td><td class="mono">${fmtMoney(mv,'CNY')}</td><td style="color:${upl>=0?'var(--accent2)':'var(--danger)'}">${fmtMoney(upl,'CNY')} <small>(${(upl/(avg*qty)*100).toFixed(2)}%)</small></td></tr>`;
+    $('posCount').textContent = '1';
+  } else {
+    posBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">空仓（已平或未开仓）</td></tr>`;
+    $('posCount').textContent='0';
+  }
+  const tradeBody = document.querySelector('#tradeTable tbody');
+  if(!result.trades.length){
+    tradeBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">暂无交易</td></tr>`;
+  } else {
+    tradeBody.innerHTML = result.trades.map(t=>{
+      const sh = toShanghaiDate(t.timestamp);
+      const time = `${String(sh.getHours()).padStart(2,'0')}:${String(sh.getMinutes()).padStart(2,'0')}`;
+      return `<tr><td class="mono">${time}</td><td><span class="tag ${t.side.toLowerCase()}">${t.side==='BUY'?'买入':'卖出'}</span></td><td class="mono">${t.qty}</td><td class="mono">${fmtMoney(t.price,'CNY')}</td><td class="mono">${fmtMoney(t.commission,'CNY')}</td><td class="mono">${fmtMoney(t.equity,'CNY')}</td></tr>`;
+    }).join('');
+  }
+  $('tradeCount').textContent = result.trades.length + ' 笔';
+}
+
+function collectConfig(){
+  return {
+    initialCash: parseFloat($('initial').value)||100000,
+    perTradeFraction: (parseFloat($('perTrade').value)||10)/100,
+    maxGrossFraction: (parseFloat($('maxGross').value)||50)/100,
+    dailyLimit: (parseFloat($('dailyLimit').value)||2)/100,
+    fast: parseInt($('fast').value)||20,
+    slow: parseInt($('slow').value)||50,
+    slippageBps: parseFloat($('slippage').value)||5,
+    commission: parseFloat($('commission').value)||0,
+  };
+}
+
+function doRun(){
+  const cfg = collectConfig();
+  if(cfg.fast>=cfg.slow){ alert('快线必须 < 慢线'); return; }
+  const result = runBacktest(bars, cfg);
+  const bench = buyHold(bars, cfg);
+  lastEquityCurve = result.equityCurve;
+  lastTrades = result.trades;
+  lastRunConfig = cfg;
+  lastPositions = [{qty: result.positionQty, avg: result.avgPrice}];
+  benchCache = bench.curve;
+  // update UI
+  updateMetrics(result, bench);
+  renderTables(result);
+  drawChart(result.equityCurve, bench.curve);
+  // store globally
+  window.__result = result;
+  window.__bench = bench;
+  window.__bars = bars;
+  try{ drawSMC(bars); }catch(e){}
+}
+
+$('runBtn').addEventListener('click', doRun);
+$('demoBtn').addEventListener('click', ()=>{ bars = genDemo(3); doRun(); });
+$('refreshBtn').addEventListener('click', ()=>{ bars = genDemo(3); doRun(); });
+$('exportTradesBtn').addEventListener('click', ()=>{
+  if(!lastTrades.length){ alert('暂无交易'); return; }
+  const header = 'timestamp,symbol,side,qty,price,commission,equity,note,cost_is_placeholder\n';
+  const rows = lastTrades.map(t=> `${t.timestamp.toISOString()},159502.SZ,${t.side},${t.qty},${t.price},${t.commission},${t.equity},${t.note},true`).join('\n');
+  const blob = new Blob([header+rows],{type:'text/csv'});
+  const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='159502_trades_demo.csv'; a.click(); URL.revokeObjectURL(url);
+});
+$('exportEquityBtn').addEventListener('click', ()=>{
+  if(!lastEquityCurve.length){ alert('暂无权益数据'); return; }
+  const header='timestamp,equity,cash,gross,close,cost_note\n';
+  const rows = lastEquityCurve.map(p=> `${p.timestamp.toISOString()},${p.equity},${p.cash},${p.gross},${p.close},"${$('slippage').value}bps/边占位,非真实费率"`).join('\n');
+  const blob = new Blob([header+rows],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='159502_equity_demo.csv'; a.click();
+});
+
+$('csvFile').addEventListener('change', async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const text = await file.text();
+  try{
+    const parsed = parseCSV(text);
+    bars = parsed;
+    alert(`已载入 ${bars.length} 根 SZ 5 分钟 bar（已过滤常规时段）`);
+    doRun();
+  } catch(err){ alert('CSV 解析失败: '+ err.message); }
+});
+
+// ── 大屏实时脉冲（合成占位，与前端 SZLiveTicker 同口径，明确非实时）— 照片价 1.528 锚定 ──
+let tickPrice = 1.528, tickPrevClose=1.519, tickOpen=1.540, tickHigh=1.541, tickLow=1.521, tickVolume=811100, tickTurnover=124000000, tickLimitUp=1.671, tickLimitDown=1.367;
+let tickKDJ_K=21.41, tickKDJ_D=22.29, tickKDJ_J=19.65, tickMACD_DIF=-0.02, tickMACD_DEA=-0.01, tickMACD_BAR=-0.02;
+let tickLastUpdate = Date.now();
+function tickNext(){
+  const drift = (1.528 - tickPrice)*0.03;
+  const step = (Math.random()-0.5)*0.008;
+  tickPrice = Math.max(tickLimitDown+0.001, Math.min(tickLimitUp-0.001, tickPrice + drift + step));
+  tickHigh = Math.max(tickHigh, tickPrice);
+  tickLow  = Math.min(tickLow, tickPrice);
+  tickVolume += Math.floor(Math.random()*16000)+8000;
+  tickTurnover += Math.floor(Math.random()*80000)+20000;
+  // KDJ/MACD 轻抖
+  tickKDJ_K += (Math.random()-0.5)*0.08; tickKDJ_D += (Math.random()-0.5)*0.08; tickKDJ_J += (Math.random()-0.5)*0.08;
+  tickMACD_DIF += (Math.random()-0.5)*0.01; tickMACD_DEA += (Math.random()-0.5)*0.01; tickMACD_BAR += (Math.random()-0.5)*0.01;
+  tickLastUpdate = Date.now();
+  // SMA from last bars tail + tick
+  try{
+    const closes = bars.slice(-50).map(b=>b.close).concat([tickPrice]);
+    const fast = parseInt($('fast').value)||20, slow=parseInt($('slow').value)||50;
+    const sma = (arr,w)=> arr.length>=w ? arr.slice(-w).reduce((a,b)=>a+b,0)/w : null;
+    const sFast = sma(closes, fast), sSlow = sma(closes, slow);
+    const sig = sFast!=null && sSlow!=null ? (sFast>sSlow?'BUY':sFast<sSlow?'SELL':'HOLD') : 'HOLD';
+    const prevClose = tickPrevClose;
+    const chg = tickPrice - prevClose, chgPct = prevClose? chg/prevClose*100 : 0;
+    const up = chg>=0;
+    // DOM — 中式红涨绿跌复刻照片2
+    const priceEl = $('livePrice'); priceEl.style.color = up ? '#e35d5d' : '#2e7d32';
+    priceEl.innerHTML = tickPrice.toFixed(3) + ' <span style="font-size:13px; color:#8ea096">CNY</span>';
+    const chEl = $('liveChange'); chEl.style.color = up ? '#e35d5d' : '#2e7d32';
+    chEl.textContent = `${chg>=0?'+':''}${chg.toFixed(3)} ${chgPct>=0?'+':''}${chgPct.toFixed(2)}%`;
+    $('liveOpen').textContent = tickOpen.toFixed(3); $('liveHigh').textContent = tickHigh.toFixed(3); $('liveLow').textContent = tickLow.toFixed(3);
+    if($('livePrevClose')) $('livePrevClose').textContent = tickPrevClose.toFixed(3);
+    if($('liveLimitUp')) $('liveLimitUp').textContent = tickLimitUp.toFixed(3);
+    if($('liveLimitDown')) $('liveLimitDown').textContent = tickLimitDown.toFixed(3);
+    $('liveVolume').textContent = (tickVolume/10000).toFixed(2) + '万手';
+    if($('liveTurnover')) $('liveTurnover').textContent = (tickTurnover/100000000).toFixed(2) + '亿';
+    $('liveTime').textContent = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) + ' · 上海';
+    if($('liveKDJ')) $('liveKDJ').textContent = `KDJ(9,3,3) K:${tickKDJ_K.toFixed(2)} D:${tickKDJ_D.toFixed(2)} J:${tickKDJ_J.toFixed(2)}`;
+    if($('liveMACD')) $('liveMACD').textContent = `MACD(12,26,9) DIF:${tickMACD_DIF.toFixed(2)} DEA:${tickMACD_DEA.toFixed(2)} MACD:${tickMACD_BAR.toFixed(2)}`;
+    $('liveSMAFast').textContent = `SMA 快: ${sFast!=null?sFast.toFixed(3):'--'}`;
+    $('liveSMASlow').textContent = `SMA 慢: ${sSlow!=null?sSlow.toFixed(3):'--'}`;
+    const sigEl=$('liveSignal'); sigEl.textContent = sig + ' · 下一根开盘≈' + (sig==='BUY'? (tickPrice*1.0005).toFixed(4) : sig==='SELL'? (tickPrice*0.9995).toFixed(4) : tickPrice.toFixed(4));
+    sigEl.style.color = sig==='BUY'?'#a8f06a':sig==='SELL'?'#ff6b6b':'#bfefff';
+    // 同步持仓/权益小卡（与回测结果联动：持仓量取 lastPositions，权益按当前价重算）
+    const cfg = collectConfig();
+    const posQty = (window.__result && window.__result.positionQty) || 0;
+    const avg = (window.__result && window.__result.avgPrice) || 1.021;
+    const equityNow = (window.__result ? window.__result.cash : cfg.initialCash) + posQty * tickPrice;
+    const initial = cfg.initialCash;
+    const dailyRet = initial? (equityNow/initial-1)*100 : 0;
+    $('liveEquity').textContent = fmtMoney(equityNow,'CNY');
+    $('liveCash').textContent = `现金 ${fmtMoney((window.__result?window.__result.cash:initial),'CNY')} · 持仓 ¥${(posQty*tickPrice).toLocaleString()}`;
+    $('liveDaily').textContent = `${dailyRet>=0?'+':''}${dailyRet.toFixed(2)}%`;
+    $('liveDaily').style.color = dailyRet>=0?'var(--accent2)':'var(--danger)';
+    $('liveRisk').textContent = `熔断线 ${(cfg.dailyLimit*100).toFixed(2)}% · ${Math.abs(dailyRet)<cfg.dailyLimit*100?'可交易':'已止买'}`;
+    $('livePos').textContent = posQty? `159502.SZ ${posQty}股 @${avg.toFixed(3)}` : '空仓';
+    $('liveUpl').textContent = posQty? `未实现 ${(tickPrice-avg)*posQty>=0?'+':''}${((tickPrice-avg)*posQty).toFixed(2)} CNY` : '未实现 --';
+    $('liveCost').textContent = `${cfg.slippageBps} bps · ${cfg.commission} /笔`;
+  }catch(e){}
+}
+setInterval(tickNext, 1300);
+
+// auto run on load
+window.addEventListener('load', ()=>{ doRun(); tickNext(); });
+window.addEventListener('resize', ()=>{ if(lastEquityCurve.length && benchCache) drawChart(lastEquityCurve, benchCache); });
+</script>
+</body>
+</html>

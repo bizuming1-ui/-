@@ -1,0 +1,12 @@
+[package]
+name = "rust_core"
+version = "0.1.0"
+edition = "2021"
+description = "高性能 SMA/回测内核（Rust）—— 第一性原理：CPU 缓存友好、零拷贝切片，后续通过 PyO3 暴露给 Python"
+
+[lib]
+name = "rust_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module"] }
