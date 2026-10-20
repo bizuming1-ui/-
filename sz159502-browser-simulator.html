@@ -67,38 +67,6 @@
 
   <div class="notice">同花顺 Playground 手动查询 <code>/api/fund/market/snapshot?thscode=159502.SZ</code> 返回 <code>code=0</code>，但<strong>费用、额度、授权范围尚未确认</strong>。本模拟器<strong>不发起真实 API 调用</strong>，实时轮询默认关闭，Key 仅服务端环境变量可信；历史基金接口为日线，<strong>无已授权 5 分钟历史不做真实回测</strong>，当前为合成离线演示。</div>
 
-  <!-- 大屏实时脉冲（合成占位，明确非实时） -->
-  <div class="card" id="liveTickerCard" style="margin-top:12px; background:linear-gradient(180deg,#0a1e22,#081214); border-color:#1c4a52">
-    <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:0">
-      <div style="padding:16px 16px; border-right:1px solid #143035">
-        <div style="font:11px ui-monospace; color:#7fb0b6">159502.SZ · 嘉实标普生物科技精选行业 ETF（QDII） <span style="color:#e3a857; border:1px solid #3a3a1a; background:#2a2410; padding:2px 8px; border-radius:999; margin-left:6px">合成脉冲 · 非实时 · 成本占位</span></div>
-        <div style="display:flex; align-items:baseline; gap:10; margin-top:6px; flex-wrap:wrap">
-          <div id="livePrice" style="font-size:38px; font-weight:900; letter-spacing:-1px; color:#a8f06a">1.0450 <span style="font-size:13px; color:#8ea096">CNY</span></div>
-          <div id="liveChange" style="display:flex; align-items:center; gap:6; background:rgba(168,240,106,.12); border:1px solid #2a4a1a; border-radius:999px; padding:6px 10px; font-weight:700; color:#a8f06a">+0.0030 (+0.29%)</div>
-          <span id="liveTime" style="font:11px ui-monospace; color:#8ea096">--:--:-- · 上海</span>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8; margin-top:10px">
-          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">今开</div><div id="liveOpen" style="font-weight:700">1.0410</div></div>
-          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">最高</div><div id="liveHigh" style="font-weight:700">1.0550</div></div>
-          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">最低</div><div id="liveLow" style="font-weight:700">1.0360</div></div>
-          <div style="background:#0f262a; border:1px solid #1a3a3e; border-radius:10px; padding:8px 10px"><div style="font:10px ui-monospace; color:#8ea096">成交量</div><div id="liveVolume" style="font-weight:700">1,250,000</div></div>
-        </div>
-        <div style="margin-top:10px; display:flex; gap:6; flex-wrap:wrap; font:11px ui-monospace; color:#9fb0b4">
-          <span id="liveSMAFast" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">SMA 快: --</span>
-          <span id="liveSMASlow" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">SMA 慢: --</span>
-          <span id="liveSignal" style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">HOLD</span>
-          <span style="background:#132a2e; border:1px solid #1c4a52; padding:4px 8px; border-radius:999">下一根 K 开盘成交 · 深圳 09:30-11:30/13:00-15:00</span>
-        </div>
-      </div>
-      <div style="padding:12px; display:grid; grid-template-columns:1fr 1fr; gap:8; background:#0a171a">
-        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">账户权益（模拟）</div><div id="liveEquity" style="font-size:16px; font-weight:800">¥101,820.00</div><div id="liveCash" style="font:11px ui-monospace; color:#8ea096">现金 -- · 持仓 --</div></div>
-        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">当日</div><div id="liveDaily" style="font-size:16px; font-weight:800">+1.82%</div><div id="liveRisk" style="font:11px ui-monospace; color:#8ea096">熔断线 2.00%</div></div>
-        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">持仓</div><div id="livePos" style="font-size:13px; font-weight:700">159502.SZ 800股 @1.021</div><div id="liveUpl" style="font:11px ui-monospace; color:#8ea096">未实现 --</div></div>
-        <div style="background:#101c1f; border:1px solid #1a3a3e; border-radius:12px; padding:10px"><div style="font:11px ui-monospace; color:#8ea096">成本（占位）</div><div id="liveCost" style="font-size:13px; font-weight:700">5 bps · 0 /笔</div><div style="font:11px ui-monospace; color:#e3a857">成本为可配置占位值，非真实费率</div></div>
-      </div>
-    </div>
-  </div>
-
   <div class="grid" style="margin-top:12px">
     <div class="card">
       <div class="card-h"><h2>参数 · 离线可调</h2><span class="kicker">SZSE 09:30-11:30/13:00-15:00</span></div>
@@ -638,60 +606,8 @@ $('csvFile').addEventListener('change', async (e)=>{
   } catch(err){ alert('CSV 解析失败: '+ err.message); }
 });
 
-// ── 大屏实时脉冲（合成占位，与前端 SZLiveTicker 同口径，明确非实时） ──
-let tickPrice = 1.045, tickPrevClose=1.042, tickOpen=1.041, tickHigh=1.055, tickLow=1.036, tickVolume=1250000;
-let tickLastUpdate = Date.now();
-function tickNext(){
-  const drift = (1.045 - tickPrice)*0.03;
-  const step = (Math.random()-0.5)*0.006;
-  tickPrice = Math.max(0.78, Math.min(1.32, tickPrice + drift + step));
-  tickHigh = Math.max(tickHigh, tickPrice);
-  tickLow  = Math.min(tickLow, tickPrice);
-  tickVolume += Math.floor(Math.random()*16000)+8000;
-  tickLastUpdate = Date.now();
-  // SMA from last bars tail + tick
-  try{
-    const closes = bars.slice(-50).map(b=>b.close).concat([tickPrice]);
-    const fast = parseInt($('fast').value)||20, slow=parseInt($('slow').value)||50;
-    const sma = (arr,w)=> arr.length>=w ? arr.slice(-w).reduce((a,b)=>a+b,0)/w : null;
-    const sFast = sma(closes, fast), sSlow = sma(closes, slow);
-    const sig = sFast!=null && sSlow!=null ? (sFast>sSlow?'BUY':sFast<sSlow?'SELL':'HOLD') : 'HOLD';
-    const prevClose = tickPrevClose;
-    const chg = tickPrice - prevClose, chgPct = prevClose? chg/prevClose*100 : 0;
-    const up = chg>=0;
-    // DOM
-    const priceEl = $('livePrice'); priceEl.style.color = up ? 'var(--accent2)' : 'var(--danger)';
-    priceEl.innerHTML = tickPrice.toFixed(4) + ' <span style="font-size:13px; color:#8ea096">CNY</span>';
-    const chEl = $('liveChange'); chEl.style.color = up?'#a8f06a':'#ff6b6b'; chEl.style.background = up?'rgba(168,240,106,.12)':'rgba(255,107,107,.12)'; chEl.style.borderColor = up?'#2a4a1a':'#4a2a2a';
-    chEl.textContent = `${chg>=0?'+':''}${chg.toFixed(4)} (${chgPct>=0?'+':''}${chgPct.toFixed(2)}%)`;
-    $('liveOpen').textContent = tickOpen.toFixed(4); $('liveHigh').textContent = tickHigh.toFixed(4); $('liveLow').textContent = tickLow.toFixed(4);
-    $('liveVolume').textContent = tickVolume.toLocaleString();
-    $('liveTime').textContent = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) + ' · 上海';
-    $('liveSMAFast').textContent = `SMA 快: ${sFast!=null?sFast.toFixed(4):'--'}`;
-    $('liveSMASlow').textContent = `SMA 慢: ${sSlow!=null?sSlow.toFixed(4):'--'}`;
-    const sigEl=$('liveSignal'); sigEl.textContent = sig + ' · 下一根开盘≈' + (sig==='BUY'? (tickPrice*1.0005).toFixed(4) : sig==='SELL'? (tickPrice*0.9995).toFixed(4) : tickPrice.toFixed(4));
-    sigEl.style.color = sig==='BUY'?'#a8f06a':sig==='SELL'?'#ff6b6b':'#bfefff';
-    // 同步持仓/权益小卡（与回测结果联动：持仓量取 lastPositions，权益按当前价重算）
-    const cfg = collectConfig();
-    const posQty = (window.__result && window.__result.positionQty) || 0;
-    const avg = (window.__result && window.__result.avgPrice) || 1.021;
-    const equityNow = (window.__result ? window.__result.cash : cfg.initialCash) + posQty * tickPrice;
-    const initial = cfg.initialCash;
-    const dailyRet = initial? (equityNow/initial-1)*100 : 0;
-    $('liveEquity').textContent = fmtMoney(equityNow,'CNY');
-    $('liveCash').textContent = `现金 ${fmtMoney((window.__result?window.__result.cash:initial),'CNY')} · 持仓 ¥${(posQty*tickPrice).toLocaleString()}`;
-    $('liveDaily').textContent = `${dailyRet>=0?'+':''}${dailyRet.toFixed(2)}%`;
-    $('liveDaily').style.color = dailyRet>=0?'var(--accent2)':'var(--danger)';
-    $('liveRisk').textContent = `熔断线 ${(cfg.dailyLimit*100).toFixed(2)}% · ${Math.abs(dailyRet)<cfg.dailyLimit*100?'可交易':'已止买'}`;
-    $('livePos').textContent = posQty? `159502.SZ ${posQty}股 @${avg.toFixed(3)}` : '空仓';
-    $('liveUpl').textContent = posQty? `未实现 ${(tickPrice-avg)*posQty>=0?'+':''}${((tickPrice-avg)*posQty).toFixed(2)} CNY` : '未实现 --';
-    $('liveCost').textContent = `${cfg.slippageBps} bps · ${cfg.commission} /笔`;
-  }catch(e){}
-}
-setInterval(tickNext, 1300);
-
 // auto run on load
-window.addEventListener('load', ()=>{ doRun(); tickNext(); });
+window.addEventListener('load', doRun);
 window.addEventListener('resize', ()=>{ if(lastEquityCurve.length && benchCache) drawChart(lastEquityCurve, benchCache); });
 </script>
 </body>

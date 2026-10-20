@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, Bell, Check, ChevronDown, CircleHelp,
   Code2, Copy, Download, ExternalLink, FileChartColumnIncreasing, Gauge, Layers3,
@@ -28,15 +28,6 @@ type Dashboard = {
   engine: { enabled: boolean; note: string }; equity_curve: { time: string; equity: number; benchmark: number }[];
   orders: { time: string; symbol: string; side: string; qty: number; status: string; demo?: boolean }[];
   metrics: { total_return: number; max_drawdown: number; sharpe: number | null; win_rate: number | null } | null;
-};
-
-type SZRealtime = {
-  symbol: string; name: string; currency: string; price: number; prev_close: number; open: number; high: number; low: number; volume: number;
-  change: number; change_pct: number; sma_fast: number | null; sma_slow: number | null; signal: string; next_open_estimate: number; next_bar_execution: string;
-  timestamp: string; is_demo: boolean; is_realtime_placeholder: boolean; note: string;
-  account: SZDashboard['account']; positions: Position[]; engine: SZDashboard['engine'];
-  risk: { initial_equity: number; daily_drawdown_pct: number; daily_loss_limit_pct: number; can_trade: boolean };
-  cost: { slippage_bps: number; commission_per_order: number; note: string; is_placeholder: boolean };
 };
 
 const demo: Dashboard = {
@@ -251,71 +242,6 @@ function KagglePage({code,copied,onCopy}:{code:string;copied:boolean;onCopy:()=>
 function ActivityPage({data}:{data:Dashboard}){return <section className="panel full-panel"><div className="panel-header"><div><div className="panel-kicker"><span className="kicker-dot orange"/> ORDER JOURNAL <span className="panel-separator">/</span>执行记录</div><h2>最近订单 <span className="count-chip">{data.orders.length}</span></h2></div><span className="feed-badge">{data.mode==='paper'?'ALPACA PAPER':'DEMO FIXTURE'}</span></div><div className="activity-table-wrap"><table><thead><tr><th>时间</th><th>标的</th><th>方向</th><th>数量</th><th>状态</th><th>执行环境</th></tr></thead><tbody>{data.orders.map((o,i)=><tr key={`${o.symbol}-${i}`}><td className="mono">{o.time}</td><td><strong>{o.symbol}</strong></td><td><span className={`side-tag ${o.side.toLowerCase()}`}>{o.side==='BUY'?'买入':'卖出'}</span></td><td className="mono">{o.qty||'—'}</td><td><span className="order-status"><i/>{o.status}</span></td><td>{o.demo?'演示样例':'Paper Only'}</td></tr>)}</tbody></table>{data.orders.length===0&&<div className="blank-state"><Activity size={22}/><strong>暂无订单记录</strong><span>确认后的 Paper 订单会出现在这里。</span></div>}</div><div className="table-bottom-note"><ShieldCheck size={14}/>Paper 状态为券商提交回报，持仓以账户快照为准；不连接 Live API。</div></section>;}
 function SettingsPage({data,publicUrl,szData}:{data:Dashboard;publicUrl:string;szData:SZDashboard|null}){return <div className="settings-layout"><section className="panel settings-card"><div className="panel-kicker"><span className="kicker-dot blue"/> ENVIRONMENT <span className="panel-separator">/</span>运行环境</div><h2>访问与服务</h2><SettingLine title="运行模式" sub="真实部署由后端显式配置" value={data.mode==='paper'?'PAPER':'DEMO'}/><SettingLine title="市场数据" sub="Paper 模式读取 IEX 单一交易所 feed" value={data.feed}/><SettingLine title="公开地址" sub="二维码编码此 HTTPS 地址" value={publicUrl}/><SettingLine title="计算环境" sub="Notebook 不使用 GPU" value="CPU ONLY"/>{szData&&<><SettingLine title="159502 市场" sub="深圳 09:30-11:30 / 13:00-15:00 · 允许隔夜" value={`${szData.symbol} · ${szData.market} · ${szData.timezone}`}/><SettingLine title="159502 初始权益" sub="单标的纸面模拟，CNY" value={`¥${szData.account.initial_equity.toLocaleString()} · ¥${szData.account.cash.toLocaleString()} 可用`}/><SettingLine title="159502 成本" sub="可配置占位值，非真实费率" value={`${szData.cost.slippage_bps} bps / ${szData.cost.commission_per_order} · ${szData.cost.note}`}/></>}</section><section className="panel settings-card"><div className="panel-kicker"><span className="kicker-dot amber"/> SAFETY <span className="panel-separator">/</span>安全约定</div><h2>凭证与风控</h2><SecurityNote icon={LockKeyhole} title="密钥只存在服务器端" text="TONGHUASHUN_API_KEY 仅服务端环境变量，前端/浏览器/Notebook/GitHub 不得保存；Alpaca 亦同。"/><SecurityNote icon={ShieldCheck} title="Live 交易路径不存在" text="应用拒绝非 Paper 端点，不包含真实下单模式；159502 仅纸面模拟。"/><SecurityNote icon={RefreshCw} title="重启先对账" text="停机期间旧信号不补发；日回撤熔断后止新买并尝试卖出，需人工确认后恢复。"/>{szData&&<SecurityNote icon={Activity} title="159502 未验证事项" text={szData.unverified.join('；')} />}</section></div>;}
 
-function SZLiveTicker(){
-  const [tick, setTick] = useState<SZRealtime | null>(null);
-  const [flash, setFlash] = useState<'up'|'down'|null>(null);
-  const prevRef = useRef<number | null>(null);
-  useEffect(()=>{
-    let alive = true;
-    const fetchTick = async () => {
-      try{
-        const res = await fetch('/api/sz159502/realtime', { credentials:'same-origin' });
-        if(!res.ok) return;
-        const body = await res.json() as SZRealtime;
-        if(!alive) return;
-        if(prevRef.current !== null){
-          if(body.price > prevRef.current) { setFlash('up'); setTimeout(()=>setFlash(null), 600); }
-          else if(body.price < prevRef.current) { setFlash('down'); setTimeout(()=>setFlash(null), 600); }
-        }
-        prevRef.current = body.price;
-        setTick(body);
-      }catch{}
-    };
-    void fetchTick();
-    const id = window.setInterval(fetchTick, 1500);
-    return ()=>{ alive=false; window.clearInterval(id); };
-  },[]);
-  if(!tick) return <div className="panel" style={{padding:16, background:'linear-gradient(135deg,#081214,#10282c)', border:'1px solid #1c4a52'}}><div style={{display:'flex',alignItems:'center',gap:10,color:'#8ea096'}}><Radio size={14} className="spin"/> 正在连接离线合成脉冲（明确非实时）…</div></div>;
-  const up = tick.change >= 0;
-  return <div className={`panel sz-ticker-panel ${flash ? `flash-${flash}`:''}`} style={{padding:0, overflow:'hidden', border:'1px solid #1c4a52', background:'linear-gradient(180deg,#0a1e22,#081214)'}}>
-    <div style={{display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:0}}>
-      <div style={{padding:'18px 20px', borderRight:'1px solid #143035'}}>
-        <div style={{font:'11px ui-monospace', color:'#7fb0b6', letterSpacing:.6}}>{tick.symbol} · {tick.name} <span style={{color:'#e3a857',border:'1px solid #3a3a1a',background:'#2a2410',padding:'1px 6px',borderRadius:999,marginLeft:6}}>合成脉冲 · 非实时 · {tick.note}</span></div>
-        <div style={{display:'flex',alignItems:'baseline',gap:12, marginTop:6}}>
-          <div style={{fontSize:42, fontWeight:900, letterSpacing:-1, color: up ? '#a8f06a' : '#ff6b6b', lineHeight:1}}>{tick.price.toFixed(4)} <span style={{fontSize:14, fontWeight:600, color:'#8ea096'}}>{tick.currency}</span></div>
-          <div style={{display:'flex',alignItems:'center',gap:6, background: up ? 'rgba(168,240,106,.12)' : 'rgba(255,107,107,.12)', border:`1px solid ${up?'#2a4a1a':'#4a2a2a'}`, borderRadius:999, padding:'6px 10px'}}>
-            {up ? <ArrowUpRight size={14} color="#a8f06a"/> : <ArrowDownRight size={14} color="#ff6b6b"/>}
-            <span style={{fontWeight:700, color: up?'#a8f06a':'#ff6b6b'}}>{tick.change>=0?'+':''}{tick.change.toFixed(4)} ({tick.change_pct>=0?'+':''}{tick.change_pct.toFixed(2)}%)</span>
-          </div>
-          <span style={{font:'11px ui-monospace', color:'#8ea096'}}>{new Date(tick.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit', hour12:false})} · 上海</span>
-        </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginTop:12}}>
-          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>今开</div><div style={{fontWeight:700}}>{tick.open.toFixed(4)}</div></div>
-          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>最高</div><div style={{fontWeight:700}}>{tick.high.toFixed(4)}</div></div>
-          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>最低</div><div style={{fontWeight:700}}>{tick.low.toFixed(4)}</div></div>
-          <div style={{background:'#0f262a',border:'1px solid #1a3a3e',borderRadius:10,padding:'8px 10px'}}><div style={{font:'10px ui-monospace',color:'#8ea096'}}>成交量</div><div style={{fontWeight:700}}>{tick.volume.toLocaleString()}</div></div>
-        </div>
-        <div style={{marginTop:10, display:'flex', gap:8, flexWrap:'wrap', font:'11px ui-monospace', color:'#9fb0b4'}}>
-          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999}}>SMA{tick.sma_fast!=null?` 快:${tick.sma_fast.toFixed(4)}`:''}</span>
-          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999}}>SMA{tick.sma_slow!=null?` 慢:${tick.sma_slow.toFixed(4)}`:''}</span>
-          <span style={{background: tick.signal==='BUY'?'rgba(168,240,106,.12)':tick.signal==='SELL'?'rgba(255,107,107,.12)':'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999, color: tick.signal==='BUY'?'#a8f06a':tick.signal==='SELL'?'#ff6b6b':'#bfefff'}}>{tick.signal} · 下一根开盘≈{tick.next_open_estimate.toFixed(4)}</span>
-          <span style={{background:'#132a2e',border:'1px solid #1c4a52',padding:'4px 8px',borderRadius:999}}>{tick.next_bar_execution}</span>
-        </div>
-      </div>
-      <div style={{padding:'14px 14px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, background:'#0a171a'}}>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>账户权益</div><div style={{fontSize:18,fontWeight:800}}>{new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(tick.account.equity)}</div><div style={{font:'11px ui-monospace',color:'#8ea096'}}>现金 ¥{tick.account.cash.toLocaleString()} · 持仓 ¥{tick.account.portfolio_value.toLocaleString()}</div></div>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>当日表现</div><div style={{fontSize:18,fontWeight:800, color: tick.risk.daily_drawdown_pct>0 ? '#ff6b6b' : '#a8f06a'}}>{tick.risk.daily_drawdown_pct>0 ? `-${tick.risk.daily_drawdown_pct.toFixed(2)}% 回撤` : `+${(tick.account.equity/tick.risk.initial_equity*100-100).toFixed(2)}%`}</div><div style={{font:'11px ui-monospace',color:'#8ea096'}}>熔断线 {tick.risk.daily_loss_limit_pct.toFixed(2)}% · {tick.risk.can_trade ? '可交易' : '已止买'}</div></div>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>持仓（模拟）</div><div style={{fontSize:14,fontWeight:700}}>{tick.positions.map(p=>`${p.symbol} ${p.qty}股 @${p.avg_entry_price.toFixed(3)}`).join(' · ') || '空仓'}</div><div style={{font:'11px ui-monospace',color:'#8ea096'}}>未实现 {tick.positions.reduce((a,p)=>a+p.unrealized_pl,0).toFixed(2)} CNY</div></div>
-        <div style={{background:'#101c1f',border:'1px solid #1a3a3e',borderRadius:12,padding:'10px 12px'}}><div style={{font:'11px ui-monospace',color:'#8ea096'}}>成本（占位）</div><div style={{fontSize:14,fontWeight:700}}>{tick.cost.slippage_bps} bps · {tick.cost.commission_per_order} /笔</div><div style={{font:'11px ui-monospace',color:'#e3a857'}}>{tick.cost.note}</div></div>
-        <div style={{gridColumn:'1 / -1', background:'#102024', border:'1px solid #1a3a3e', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-          <div style={{font:'11px ui-monospace', color:'#8ea096', display:'flex', alignItems:'center', gap:6}}><span className="status-dot" style={{background: tick.engine.enabled ? '#a8f06a' : '#e3a857'}}/> 引擎：{tick.engine.note} · {tick.engine.enabled ? 'ARMED' : 'PAUSED'}</div>
-          <span style={{font:'11px ui-monospace', color:'#8ea096', background:'#0f262a', padding:'4px 8px', borderRadius:999, border:'1px solid #1a3a3e'}}>仅纸面 · 允许隔夜 · {tick.currency}</span>
-        </div>
-      </div>
-    </div>
-  </div>;
-}
-
 function SZ159502Page({data,loading,onRefresh,csrf}:{data:SZDashboard|null;loading:boolean;onRefresh:()=>void;csrf:string}){
   if (!data) return <section className="panel full-panel"><div className="panel-header"><div><div className="panel-kicker"><span className="kicker-dot blue"/> 159502 PAPER SIM <span className="panel-separator">/</span>离线纸面</div><h2>159502 嘉实标普生物科技精选行业 ETF（QDII）</h2></div></div><div className="blank-state"><RefreshCw size={22} className={loading?'spin':''}/><strong>离线 Demo 加载中</strong><span>未获授权的五分钟历史不做真实回测；当前为合成演示数据。</span></div></section>;
   const dailyReturn = data.account.initial_equity ? (data.account.equity / data.account.initial_equity - 1) * 100 : 0;
@@ -335,8 +261,7 @@ function SZ159502Page({data,loading,onRefresh,csrf}:{data:SZDashboard|null;loadi
     } catch (e) { alert(e instanceof Error ? e.message : '请求失败'); }
   };
   return <>
-    <SZLiveTicker />
-    <section className="notice-strip" style={{background:'#0f2a2f', borderColor:'#1c4a52', marginTop:10}}><div className="notice-mark"><Wallet size={15}/></div><span><strong>离线/Demo · {data.symbol}</strong><i>—</i>初始 ¥{data.account.initial_equity.toLocaleString()} · 单笔≤{data.risk.per_trade_fraction*100}% · 日熔断 {ddThreshold}% 后止新买并尝试卖出</span><button onClick={onRefresh}><RefreshCw size={13}/> 刷新离线数据</button></section>
+    <section className="notice-strip" style={{background:'#0f2a2f', borderColor:'#1c4a52'}}><div className="notice-mark"><Wallet size={15}/></div><span><strong>离线/Demo · {data.symbol}</strong><i>—</i>初始 ¥{data.account.initial_equity.toLocaleString()} · 单笔≤{data.risk.per_trade_fraction*100}% · 日熔断 {ddThreshold}% 后止新买并尝试卖出</span><button onClick={onRefresh}><RefreshCw size={13}/> 刷新离线数据</button></section>
     <section className="metric-grid">
       <MetricCard label="159502 账户权益（CNY）" value={money(data.account.equity, 'CNY')} sub={`${data.disclaimer} · ${data.feed}`} icon={Wallet} badge="CNY · PAPER SIM"/>
       <MetricCard label="账户日变动" value={pct(dailyReturn)} sub={`相对初始权益 ¥${data.account.initial_equity.toLocaleString()}`} icon={dailyReturn>=0?TrendingUp:TrendingDown} positive={dailyReturn>=0} badge="DAILY CHANGE"/>
