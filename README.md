@@ -10,6 +10,8 @@
 - 本地默认是 Demo。Alpaca 凭证、生产域名、服务器部署与真实 Paper API 尚未验证；不得把 mock/离线测试说成真实券商集成测试。
 - 默认观察清单：`SPY, QQQ, AAPL, MSFT, NVDA`；策略是只做多 SMA 20/50、5 分钟 bar、常规交易时段、已完成 bar、隔夜持仓。
 - Paper 策略限额：目标初始权益 $100,000、每标的最多 10%、总持仓最多 50%、无空头/杠杆；每日回撤达 2% 暂停新订单；自动市场单仅限 Paper endpoint。
+- 新增 **深圳 ETF 159502 单标的纸面模拟器**：嘉实标普生物科技精选行业 ETF（QDII）159502.SZ，¥100,000 初始、单笔≤10%、日回撤 2% 后止买并尝试卖出、允许隔夜、下一根可交易 K 开盘成交、成本为可配置占位值（非真实费率），离线 Demo 明确标注；同花顺 `/api/fund/market/snapshot?thscode=159502.SZ` 在 Playground 返回 code=0 但费用/额度/授权未确认，实时轮询默认关闭，Key 仅服务端 `TONGHUASHUN_API_KEY`。
+- 历史基金接口为日线，高频分钟接口不应被假装为可用；**无已授权 159502 五分钟历史时不做真实回测**，仅离线合成演示。
 - 行情使用 Alpaca IEX 单一交易所数据，不代表全市场 consolidated tape。
 - 生产凭证只保存在服务器未跟踪的 `.env` 文件；永远不要提交 API key/secret、应用口令、Session secret 或 Cloudflare Tunnel token。
 - 登录使用 HttpOnly 签名 Session、同源 CSRF 校验；单 IP 15 分钟内 5 次失败后临时限流。
