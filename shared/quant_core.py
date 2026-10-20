@@ -432,7 +432,6 @@ def run_sz159502_backtest(
     return run_backtest(validated, cfg)
 
 
-<<<<<<< HEAD
 def calc_kdj(bars: pd.DataFrame, n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
     """KDJ(9,3,3) 计算，适配照片样例；仅用已收盘 bar，无未来。"""
     need = {"high","low","close"}
@@ -462,7 +461,6 @@ def calc_macd(bars: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 
 
 def detect_smc_structure(bars: pd.DataFrame, lookback: int = 5) -> dict[str, list[dict[str, Any]]]:
     """SMC 简化：识别 BOS/ChoCh 与支撑阻力区（基于摆动高低点）。"""
-    # 仅用收盘价摆动，标记 BOS（Break of Structure）与 ChoCh（Change of Character）
     closes = bars["close"].tolist()
     highs = bars["high"].tolist()
     lows = bars["low"].tolist()
@@ -472,24 +470,18 @@ def detect_smc_structure(bars: pd.DataFrame, lookback: int = 5) -> dict[str, lis
     for i in range(lookback, len(bars)):
         ts = bars.iloc[i]["timestamp"]
         c = closes[i]
-        # BOS: 收盘突破前高
         if last_high is not None and c > last_high:
             bos.append({"timestamp": ts, "type": "bos", "price": c})
             last_high = max(last_high, c)
-        # ChoCh: 收盘跌破前低（趋势转向）
         if last_low is not None and c < last_low:
             choch.append({"timestamp": ts, "type": "choch", "price": c})
             last_low = min(last_low, c)
-        # 更新摆动区间
         if highs[i] > (last_high or -1e9): last_high = highs[i]
         if lows[i] < (last_low or 1e9): last_low = lows[i]
-    # 阻力/支撑取最近极值
     if bos: resistance.append({"price": max(b["price"] for b in bos[-3:]), "label": "Resistance Area"})
     if choch: support.append({"price": min(c["price"] for c in choch[-3:]), "label": "Support"})
     return {"bos": bos[-6:], "choch": choch[-4:], "resistance": resistance, "support": support}
 
-=======
->>>>>>> origin/arena/cf6082b3-repo
 def demo_sz159502_equity_curve(currency: str = "CNY") -> list[dict[str, Any]]:
     """离线 Demo：合成 159502 权益曲线，明确标注非实时。"""
     import math as _math

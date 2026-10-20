@@ -21,6 +21,9 @@ import random as _random
 import time as _time
 
 from backend.app.alpaca_paper import AlpacaPaperClient
+from backend.app.security import clear_login_failures, login_rate_limited, record_login_failure, require_authenticated, verify_password
+from backend.app.settings import Settings, get_settings
+from backend.app.store import StateStore
 from backend.app.paper_engine import EnginePreflightError, PaperEngine
 from backend.app.sz_market_client import SZPaperMarketClient
 from backend.app.sz_portfolio import SZPortfolioStore
@@ -28,20 +31,28 @@ from backend.app.sz159502_engine import SZ159502Engine, SZEnginePreflightError
 from backend.app.tonghuashun_market import demo_5min_bars_note, demo_snapshot, tonghuashun_status
 
 # ── 实时报价合成脉冲（离线 Demo 占位，明确非实时）─────────────────────────
-# 性能说明：热路径由 Python 向量化（numpy/pandas）承载，后续热点可渐进迁 Rust(PyO3)；
-# 行情网关 Go 并发拉取已预留（go_gateway/），此处保持轻量可验证。
+# 照片 2 静态样例（2026-10-20 11:26:54 北京，交易中）：价 1.528 高 1.541 低 1.521 开 1.540 昨收 1.519
+# 涨停 1.671 跌停 1.367 成交量 81.11万手 成交额 1.24亿 KDJ(9,3,3) MACD(12,26,9) —— 仅作界面复刻样例，非实时声称
+# 性能说明：热路径由 Python 向量化承载，后续热点可渐进迁 Rust(PyO3)；行情网关 Go 预留，此处轻量可验证。
 _SZ_TICK_STATE: dict[str, float | str] = {
-    "price": 1.045,
-    "prev_close": 1.042,
-    "open": 1.041,
-    "high": 1.055,
-    "low": 1.036,
-    "volume": 1_250_000.0,
-    "turnover": 1_305_000.0,
+    "price": 1.528,
+    "prev_close": 1.519,
+    "open": 1.540,
+    "high": 1.541,
+    "low": 1.521,
+    "volume": 811_100.0,
+    "turnover": 124_000_000.0,
+    "limit_up": 1.671,
+    "limit_down": 1.367,
+    "followers_wan": 1.09,
+    "kdj_k": 21.41,
+    "kdj_d": 22.29,
+    "kdj_j": 19.65,
+    "macd_dif": -0.02,
+    "macd_dea": -0.01,
+    "macd_bar": -0.02,
+    "sample_at": "2026-10-20T11:26:54+08:00",
 }
-from backend.app.security import clear_login_failures, login_rate_limited, record_login_failure, require_authenticated, verify_password
-from backend.app.settings import Settings, get_settings
-from backend.app.store import StateStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("quantdesk")
@@ -421,17 +432,21 @@ async def sz_engine_stop(request: Request) -> dict[str, Any]:
 
 
 def _sz_next_tick_price() -> float:
-    # 轻量确定性随机游走：均值回归至 1.045，步长 ±0.004，避免越界
-    base = 1.045
+    # 复刻照片价位锚定 1.528 ± 随机，照片样例涨跌停 1.671/1.367 为边界
+    base = 1.528
     cur = float(_SZ_TICK_STATE["price"])
-    drift = (base - cur) * 0.03  # 均值回归
-    step = (_random.random() - 0.5) * 0.006
-    nxt = max(0.78, min(1.32, cur + drift + step))
+    drift = (base - cur) * 0.03
+    step = (_random.random() - 0.5) * 0.008
+    limit_up = float(_SZ_TICK_STATE.get("limit_up", 1.671))
+    limit_down = float(_SZ_TICK_STATE.get("limit_down", 1.367))
+    nxt = max(limit_down + 0.001, min(limit_up - 0.001, cur + drift + step))
     _SZ_TICK_STATE["price"] = round(nxt, 4)
-    # 更新日内高低
     _SZ_TICK_STATE["high"] = round(max(float(_SZ_TICK_STATE["high"]), nxt), 4)
     _SZ_TICK_STATE["low"] = round(min(float(_SZ_TICK_STATE["low"]), nxt), 4)
     _SZ_TICK_STATE["volume"] = round(float(_SZ_TICK_STATE["volume"]) + _random.randint(8000, 24000), 0)
+    for k in ("kdj_k","kdj_d","kdj_j","macd_dif","macd_dea","macd_bar"):
+        base_v = float(_SZ_TICK_STATE.get(k, 0))
+        _SZ_TICK_STATE[k] = round(base_v + (_random.random()-0.5)*0.08, 2)
     return nxt
 
 def _build_sz_realtime(request: Request) -> dict[str, Any]:
@@ -505,6 +520,12 @@ def _build_sz_realtime(request: Request) -> dict[str, Any]:
         "signal": signal,
         "next_open_estimate": next_open_est,
         "next_bar_execution": "下一根可交易 K 开盘成交（深圳 09:30-11:30/13:00-15:00）",
+        "limit_up": float(_SZ_TICK_STATE.get("limit_up", 1.671)),
+        "limit_down": float(_SZ_TICK_STATE.get("limit_down", 1.367)),
+        "followers_wan": float(_SZ_TICK_STATE.get("followers_wan", 1.09)),
+        "kdj": {"k": float(_SZ_TICK_STATE.get("kdj_k", 21.41)), "d": float(_SZ_TICK_STATE.get("kdj_d", 22.29)), "j": float(_SZ_TICK_STATE.get("kdj_j", 19.65)), "params": "9,3,3"},
+        "macd": {"dif": float(_SZ_TICK_STATE.get("macd_dif", -0.02)), "dea": float(_SZ_TICK_STATE.get("macd_dea", -0.01)), "bar": float(_SZ_TICK_STATE.get("macd_bar", -0.02)), "params": "12,26,9"},
+        "sample_at": str(_SZ_TICK_STATE.get("sample_at", "2026-10-20T11:26:54+08:00")),
         "account": account,
         "positions": positions,
         "engine": eng_state,

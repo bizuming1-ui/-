@@ -435,6 +435,56 @@ def run_sz159502_backtest(
     return run_backtest(validated, cfg)
 
 
+def calc_kdj(bars: pd.DataFrame, n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
+    """KDJ(9,3,3) 计算，适配照片样例；仅用已收盘 bar，无未来。"""
+    need = {"high","low","close"}
+    if not need.issubset(bars.columns): raise ValueError(f"kdj need {need}")
+    df = bars.copy()
+    low_list = df["low"].rolling(n, min_periods=n).min()
+    high_list = df["high"].rolling(n, min_periods=n).max()
+    rsv = (df["close"] - low_list) / (high_list - low_list) * 100
+    rsv = rsv.fillna(50)
+    k = rsv.ewm(alpha=1/m1, adjust=False).mean()
+    d = k.ewm(alpha=1/m1, adjust=False).mean()
+    j = 3*k - 2*d
+    df["kdj_k"], df["kdj_d"], df["kdj_j"] = k, d, j
+    return df
+
+def calc_macd(bars: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
+    """MACD(12,26,9) 计算，适配照片样例。"""
+    if "close" not in bars.columns: raise ValueError("macd need close")
+    df = bars.copy()
+    ema_fast = df["close"].ewm(span=fast, adjust=False).mean()
+    ema_slow = df["close"].ewm(span=slow, adjust=False).mean()
+    dif = ema_fast - ema_slow
+    dea = dif.ewm(span=signal, adjust=False).mean()
+    bar = (dif - dea) * 2
+    df["macd_dif"], df["macd_dea"], df["macd_bar"] = dif, dea, bar
+    return df
+
+def detect_smc_structure(bars: pd.DataFrame, lookback: int = 5) -> dict[str, list[dict[str, Any]]]:
+    """SMC 简化：识别 BOS/ChoCh 与支撑阻力区（基于摆动高低点）。"""
+    closes = bars["close"].tolist()
+    highs = bars["high"].tolist()
+    lows = bars["low"].tolist()
+    bos, choch, resistance, support = [], [], [], []
+    last_high = max(highs[:lookback]) if len(highs)>=lookback else None
+    last_low = min(lows[:lookback]) if len(lows)>=lookback else None
+    for i in range(lookback, len(bars)):
+        ts = bars.iloc[i]["timestamp"]
+        c = closes[i]
+        if last_high is not None and c > last_high:
+            bos.append({"timestamp": ts, "type": "bos", "price": c})
+            last_high = max(last_high, c)
+        if last_low is not None and c < last_low:
+            choch.append({"timestamp": ts, "type": "choch", "price": c})
+            last_low = min(last_low, c)
+        if highs[i] > (last_high or -1e9): last_high = highs[i]
+        if lows[i] < (last_low or 1e9): last_low = lows[i]
+    if bos: resistance.append({"price": max(b["price"] for b in bos[-3:]), "label": "Resistance Area"})
+    if choch: support.append({"price": min(c["price"] for c in choch[-3:]), "label": "Support"})
+    return {"bos": bos[-6:], "choch": choch[-4:], "resistance": resistance, "support": support}
+
 def demo_sz159502_equity_curve(currency: str = "CNY") -> list[dict[str, Any]]:
     """离线 Demo：合成 159502 权益曲线，明确标注非实时。"""
     import math as _math
